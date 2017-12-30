@@ -1,5 +1,6 @@
 #include <version.h>
 #include <Arduino.h>
+#include <RFM69.h>
 
 void setup() {
     pinMode(9, OUTPUT);
