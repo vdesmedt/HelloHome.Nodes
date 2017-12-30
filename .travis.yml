@@ -30,6 +30,9 @@ python:
 install:
   - pip install -U platformio
 script:
+  - shash=$(echo ${TRAVIS_COMMIT} | cut -c 1-7)
+  - sed -i -e 's/CiSubstErr/${shash}/g' /src/version.h
+  - cat /srv/version.h
   - platformio run
 before-deploy:
   - shash=$(echo ${TRAVIS_COMMIT} | cut -c 1-7)
