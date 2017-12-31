@@ -37,11 +37,12 @@ script:
   - platformio run
 before-deploy:
   - platformio ci --keep-build-dir --board=moteino src/
+  - cp ${TRAVIS_BUILD_DIR}/.pioenvs/moteino/firmware.hex ${TRAVIS_BUILD_DIR}/.pioenvs/moteino/hellonergie-${shash}.hex
 deploy:
   provider: releases
   api_key: $GITHUB_TOKEN
   file_glob: true
-  file: ${TRAVIS_BUILD_DIR}/.pioenvs/moteino/firmware.hex
+  file: ${TRAVIS_BUILD_DIR}/.pioenvs/moteino/hellonergie-${shash}.hex
   skip_cleanup: true
   on:
     tags: true
