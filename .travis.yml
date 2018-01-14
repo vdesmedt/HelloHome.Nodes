@@ -29,15 +29,18 @@ python:
   - "2.7"
 install:
   - pip install -U platformio
+  - platformio lib -g install 38
   - platformio lib -g install 92
+  - platformio lib -g install 125
+  - platformio lib -g install 536
 script:
   - shash=$(echo ${TRAVIS_COMMIT} | cut -c 1-7)
   - sed -i -e "s/CiSubstErr/${shash}/g" ${TRAVIS_BUILD_DIR}/src/version.h
+  - sed -i -e "s/51/50/g" ${TRAVIS_BUILD_DIR}/src/version.h
   - echo ${TRAVIS_BUILD_DIR}/src/version.h
   - platformio run
 before-deploy:
-  - platformio ci --keep-build-dir --board=moteino src/
-  - cp ${TRAVIS_BUILD_DIR}/.pioenvs/moteino/firmware.hex ${TRAVIS_BUILD_DIR}/.pioenvs/moteino/hellonergie-${shash}.hex
+  - cp .pioenvs/moteino/firmware.hex .pioenvs/moteino/hellonergie-${shash}.hex
 deploy:
   provider: releases
   api_key: $GITHUB_TOKEN
