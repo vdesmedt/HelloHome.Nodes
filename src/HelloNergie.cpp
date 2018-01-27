@@ -206,7 +206,20 @@ void loop() {
 
   //Check if message for rf message
   if(radio.receiveDone()) {
-
+    switch(radio.DATA[0]) {
+      case 6 :
+        debug_print("Restart command detected\n", radio.DATA[0]);
+        if(radio.ACKRequested())
+          radio.sendACK();
+        delay(100);
+        resetFunc();        
+        break;
+      default :
+        debug_print("Unknown message type %d", radio.DATA[0]);
+        break;
+    }
+    if(radio.ACKRequested())
+      radio.sendACK();
   }
 
   //Check on pulse counters
