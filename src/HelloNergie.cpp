@@ -1,5 +1,15 @@
 #include <version.h>
 
+#include <WirelessHEX69.h>
+#include <Arduino.h>
+#include <SI7021.h>
+#include <LowPower.h>
+#include <RFM69.h>    //get it here: https://github.com/LowPowerLab/RFM69
+#include <SPI.h>      //get it here: https://github.com/LowPowerLab/SPIFlash
+#include <SPIFlash.h>
+#include <Wire.h>
+#include <messages.h>
+
 #define DEBUG true
 #define debug_print(...) \
             do { if (DEBUG) { \
@@ -8,16 +18,6 @@
               Serial.print(buffer); \
             } \
           } while (0)
-
-#include <Arduino.h>
-#include <SI7021.h>
-#include <LowPower.h>
-#include <RFM69.h>    //get it here: https://github.com/LowPowerLab/RFM69
-#include <SPI.h>      //get it here: https://github.com/LowPowerLab/SPIFlash
-#include <SPIFlash.h>
-#include <Wire.h>
-
-#include <messages.h>
 
 //RFM69
 #define RF_ENCRYPT_KEY  "passiondesfruits"
@@ -234,7 +234,7 @@ void loop() {
   }
 
   //Measure battery voltage every 10 minutes
-  if(wakeUpCount % 75 == 0) {
+  if(wakeUpCount % 2 == 0) { //75
     if(config.features & FEAT_VIN) {
       digitalWrite(VIN_TRIGGER, LOW);
       nodeInfoMsg.vIn = ((1.0 * analogRead(VIN_MEASURE)) / 1024.0 * VIN_VREF * VIN_RATIO) * 100;
