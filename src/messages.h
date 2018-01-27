@@ -3,9 +3,6 @@
 
 #include <Arduino.h>
 
-#define RPT 0
-#define CMD 2
-
 #define FEAT_SI7021 1
 #define FEAT_BMP    2
 #define FEAT_VIN    4
@@ -16,6 +13,8 @@
 typedef struct BaseMessage {
   uint8_t msgType;
 } BaseMessage;
+
+#define RPT 0
 
 typedef struct NodeInfoReport {
   const uint8_t msgType = RPT + (0 << 2);
@@ -44,9 +43,7 @@ typedef struct NodeStartedReport {
   char version[7];
 } NodeStartedReport;
 
-typedef struct ReadyForProgCommand {
-  const uint8_t msgType = RPT + (4 << 2);
-} ReadyForProgCommand;
+#define CMD 2
 
 typedef struct NodeConfigCommand {
 	const uint8_t msgType = CMD + (0 << 2);
@@ -56,5 +53,9 @@ typedef struct NodeConfigCommand {
   uint8_t nodeInfoFreq;
   uint8_t environmentFreq;
 } NodeConfigCommand;
+
+typedef struct RestartCommand {
+  const uint8_t msgType = CMD + (1 << 2);
+} RestartCommand;
 
 #endif
