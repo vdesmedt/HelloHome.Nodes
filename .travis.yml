@@ -32,7 +32,6 @@ install:
   - platformio lib -g install 38
   - platformio lib -g install 92
   - platformio lib -g install 125
-  - platformio lib -g install 531
   - platformio lib -g install 536
 script:
   - shash=$(echo ${TRAVIS_COMMIT} | cut -c 1-7)

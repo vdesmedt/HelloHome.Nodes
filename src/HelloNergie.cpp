@@ -1,6 +1,6 @@
 #include <version.h>
 
-#include <WirelessHEX69.h>
+#include <RFM69_OTA.h>
 #include <Arduino.h>
 #include <SI7021.h>
 #include <LowPower.h>
