@@ -1,13 +1,11 @@
-#include <version.h>
-
-#include <RFM69_OTA.h>
 #include <Arduino.h>
 #include <SI7021.h>
 #include <LowPower.h>
-#include <RFM69.h>    //get it here: https://github.com/LowPowerLab/RFM69
-#include <SPI.h>      //get it here: https://github.com/LowPowerLab/SPIFlash
-#include <SPIFlash.h>
-#include <Wire.h>
+#include <RFM69.h>    
+#include <RFM69_OTA.h>
+
+
+#include <version.h>
 #include <messages.h>
 
 #define DEBUG true
@@ -208,7 +206,7 @@ void loop() {
   if(radio.receiveDone()) {
     switch(radio.DATA[0]) {
       case 6 :
-        debug_print("Restart command detected\n", radio.DATA[0]);
+        debug_print("Restart command detected\n");
         if(radio.ACKRequested())
           radio.sendACK();
         delay(100);
@@ -266,7 +264,7 @@ void intTest()
   if(config.features & FEAT_DRY && digitalRead(DRY_PIN) == LOW)  dry_interrupt = true;
 }
 
-bool sendData(const void *data, size_t dataSize, bool sleep = true) {
+bool sendData(const void *data, size_t dataSize, bool sleep) {
   digitalWrite(LED, HIGH);
   bool success = radio.sendWithRetry(RF_GTW_NODE_ID, data, dataSize, 3, 40);
   if(sleep)
