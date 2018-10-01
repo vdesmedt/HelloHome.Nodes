@@ -10,6 +10,10 @@
 #define FEAT_HAL2   16
 #define FEAT_DRY    32
 
+#define PORTNUMBER_HAL1 1
+#define PORTNUMBER_HAL2 2
+#define PORTNUMBER_DRY  3
+
 typedef struct BaseMessage {
   uint8_t msgType;
 } BaseMessage;
@@ -19,13 +23,12 @@ typedef struct BaseMessage {
 typedef struct NodeInfoReport {
   const uint8_t msgType = RPT + (0 << 2);
   uint16_t sendErrorCount;
-  uint16_t startCount;
   uint16_t vIn;
 } NodeInfoReport;
 
 typedef struct PulseReport {
   const uint8_t msgType = RPT + (1 << 2);
-  uint8_t subNode;
+  uint8_t portNumber;
   uint16_t newPulses;
 } PulseReport;
 
@@ -40,7 +43,8 @@ typedef struct NodeStartedReport {
   const uint8_t msgType = RPT + (3 << 2);
   const uint8_t nodeType = 1;
   uint8_t signature[8];
-  char version[7];
+  char version[8];
+  uint16_t startCount;
 } NodeStartedReport;
 
 #define CMD 2
