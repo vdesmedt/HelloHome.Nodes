@@ -10,12 +10,13 @@
 #define DEBUG true
 #if DEBUG
   const char MSG_WAIT_RF[] = "Waiting for RF response";
-  const char MSG_FLASH_INIT[]  = "Flash init..";
+  const char MSG_FLASH_INIT[]  = "Flash init...";
   const char MSG_OK[] = "OK\n";
   const char MSG_NOK[] = "NOK\n";
   const char MSG_NOK_RESTART[] = "Restarting!\n";
-  const char MSG_READ_CONFIG[] = "reading config from flash\n";
+  const char MSG_READ_CONFIG[] = "reading config from flash...";
   const char MSG_NOCONFIG_OR_NEWVERSION[] = "No config found or new version detected. Load to default\n";
+  const char MSG_CONFIG_FOUND[] = "Config NodeId %d\n";
   const char MSG_NODECONFIG_EXPECTED_D[] = "Expected NodeConfig but received %d bytes.\n";
   const char MSG_SIGNATURE_MISSMATCH[] = "Config received for another signature.\n";
   const char MSG_NEW_CONFIG_DD[] = "New node/feature config received: %d/%d\n";
@@ -29,7 +30,7 @@
   const char MSG_DRY1_ENABLED[] = "Dry1 Enabled\n";
   const char MSG_SI_ENABLED[] = "Si Enabled\n";
   const char MSG_BMP_ENABLED[] = "Bmp Enabled\n";
-  const char MSG_SEND_MSG_D[] = "Send Msg (%d)\n";
+  const char MSG_SEND_MSG_D[] = "Will send Msg (%d)...";
   #define DEB_BUFFER_LEN 100
   #define debug_printa(msg, ...) \
               do { \
@@ -46,6 +47,7 @@
   const char MSG_NOK_RESTART[] PROGMEM = "";
   const char MSG_READ_CONFIG[] PROGMEM = "";
   const char MSG_NOCONFIG_OR_NEWVERSION[] PROGMEM = "";
+  const char MSG_CONFIG_FOUND[] = "";
   const char MSG_NODECONFIG_EXPECTED_D[] PROGMEM = "";
   const char MSG_SIGNATURE_MISSMATCH[] PROGMEM = "";
   const char MSG_NEW_CONFIG_DD[] PROGMEM = "";
@@ -59,7 +61,7 @@
 //RFM69
 #define RF_ENCRYPT_KEY  "passiondesfruits"
 #define RF_GTW_NODE_ID  254
-#define RF_IS_RFM69HW
+#define RF_IS_RFM69HW_
 
 //SPIFlash
 #define FLASH_ADR	0x20000 //First memory availble after reserved for OTA update
@@ -102,7 +104,7 @@ EnvironmentReport envMsg;
 #define CONFIG_VERSION 1
 typedef struct NodeFlashConfig {
   uint8_t confVer; //Config version, used to understand is whazt is red from flash is ok
-  unsigned char nodeId;
+  uint16_t nodeId;
   uint16_t features;
   uint16_t startCount;  
   uint8_t nodeInfoFreq;
@@ -113,36 +115,8 @@ NodeFlashConfig flashConfig;
 bool sendData(const void *data, size_t dataSize, bool sleep = true);
 void(* resetFunc) (void) = 0; //declare reset function @ address 0
 void intTest();
-
-void radioInit(int nodeId) {
-  //Initialize Radio
-  radio.initialize(RF69_868MHZ, nodeId, RF_NETWORK_ID);
-  radio.encrypt(RF_ENCRYPT_KEY);
-#ifdef RF_IS_RFM69HW
-  radio.setHighPower();
-  debug_printa(MSG_RF_INIT_DDS, nodeId, RF_NETWORK_ID, "On");
-#else
-  debug_printa(MSG_RF_INIT_DDS, nodeId, RF_NETWORK_ID, "Off");
-#endif
-}
-
-bool WaitRf(int milliseconds) {
-  int d = 100;
-  int retryCount = milliseconds / d;
-  debug_print(MSG_WAIT_RF);
-  bool rd = radio.receiveDone();
-  while(!rd && retryCount-- > 0) {
-    debug_print(".");
-    delay(d);
-    rd = radio.receiveDone();
-  }
-  if(!rd) {
-    debug_print(MSG_NOK);
-    return false;
-  }
-  debug_print(MSG_OK);
-  return true;
-}
+void radioInit(uint16_t nodeId);
+bool WaitRf(int milliseconds);
 
 void setup() {
   #ifdef DEBUG
@@ -154,7 +128,7 @@ void setup() {
   debug_print(MSG_FLASH_INIT);
   SPIFlash flash(FLASH_SS, 0xEF30); //EF30 for 4mbit  Windbond chip (W25X40CL)
   if(!flash.initialize()) {
-    debug_print(MSG_NOK_RESTART);
+    debug_print(MSG_NOK_RESTART);    
     delay(1000);
     resetFunc();
   } else {
@@ -172,10 +146,12 @@ void setup() {
     //First read or new version
     flashConfig.confVer = CONFIG_VERSION;
     flashConfig.features = 0;
-    flashConfig.nodeId = 255;
+    flashConfig.nodeId = 253;
     flashConfig.startCount = 1;
     flashConfig.environmentFreq = 0;
     flashConfig.nodeInfoFreq = 0;
+  } else {
+    debug_printa(MSG_CONFIG_FOUND, flashConfig.nodeId);
   }
 
   //Init radio
@@ -304,23 +280,55 @@ void loop() {
   }
 
   //Calculate Temperature and Humidity every environmentFreq wakeup
-  if(flashConfig.environmentFreq > 0 &&  wakeUpCount % flashConfig.environmentFreq == 0 && flashConfig.features & FEAT_SI7021) {
+  debug_printa("WC:%d ->", wakeUpCount);
+  if(flashConfig.features & FEAT_SI7021 && flashConfig.environmentFreq > 0 &&  wakeUpCount % flashConfig.environmentFreq == 0) {
+    debug_print(" SI7021");
     envMsg.temperature = siSensor.getCelsiusHundredths();
     envMsg.humidity = siSensor.getHumidityPercent();
     sendData((const void*)&envMsg, sizeof(envMsg));
   }
 
   //Measure battery voltage every 10 minutes
-  if(flashConfig.nodeInfoFreq > 0 && wakeUpCount % flashConfig.nodeInfoFreq == 0) { //75
-    if(flashConfig.features & FEAT_VIN) {
-      digitalWrite(VIN_TRIGGER, LOW);
-      nodeInfoMsg.vIn = ((1.0 * analogRead(VIN_MEASURE)) / 1024.0 * VIN_VREF * VIN_RATIO) * 100;
-      digitalWrite(VIN_TRIGGER, HIGH);
-    }
+  if(flashConfig.features & FEAT_VIN && flashConfig.nodeInfoFreq > 0 && wakeUpCount % flashConfig.nodeInfoFreq == 0) { //75
+    debug_print(" VIN");
+    digitalWrite(VIN_TRIGGER, LOW);
+    nodeInfoMsg.vIn = ((1.0 * analogRead(VIN_MEASURE)) / 1024.0 * VIN_VREF * VIN_RATIO) * 100;
+    digitalWrite(VIN_TRIGGER, HIGH);
     sendData((const void*)&nodeInfoMsg, sizeof(nodeInfoMsg));
   }
+  debug_print("\n");
 
   hal1_interrupt = hal2_interrupt = dry_interrupt = false;
+}
+
+void radioInit(uint16_t nodeId) {
+  //Initialize Radio
+  radio.initialize(RF69_868MHZ, nodeId, RF_NETWORK_ID);
+  radio.encrypt(RF_ENCRYPT_KEY);
+#ifdef RF_IS_RFM69HW
+  radio.setHighPower();
+  debug_printa(MSG_RF_INIT_DDS, nodeId, RF_NETWORK_ID, "HW");
+#else
+  debug_printa(MSG_RF_INIT_DDS, nodeId, RF_NETWORK_ID, "W");
+#endif
+}
+
+bool WaitRf(int milliseconds) {
+  int d = 100;
+  int retryCount = milliseconds / d;
+  debug_print(MSG_WAIT_RF);
+  bool rd = radio.receiveDone();
+  while(!rd && retryCount-- > 0) {
+    debug_print(".");
+    delay(d);
+    rd = radio.receiveDone();
+  }
+  if(!rd) {
+    debug_print(MSG_NOK);
+    return false;
+  }
+  debug_print(MSG_OK);
+  return true;
 }
 
 void intTest()
@@ -334,10 +342,16 @@ bool sendData(const void *data, size_t dataSize, bool sleep) {
   digitalWrite(LED, HIGH);
   debug_printa(MSG_SEND_MSG_D, ((uint8_t*)data)[0]);
   bool success = radio.sendWithRetry(RF_GTW_NODE_ID, data, dataSize, 3, 40);
-  if(sleep)
-    radio.sleep();
-  if(!success)
+  if(success) {
+    debug_print(MSG_OK);
+  } else {
+    debug_print(MSG_NOK);
     nodeInfoMsg.sendErrorCount++;
+  }
+  if(sleep) {
+    debug_print("Radio goes to sleep\n");
+    radio.sleep();
+  }
   digitalWrite(LED, LOW);
   return success;
 }
