@@ -16,7 +16,7 @@
   const char MSG_READ_CONFIG[] = "reading config from flash...";
   const char MSG_NOCONFIG_OR_NEWVERSION[] = "No config found or new version detected. Load to default\n";
   const char MSG_CONFIG_FOUND[] = "Config NodeId %d\n";
-  const char MSG_NODECONFIG_EXPECTED_D[] = "Expected NodeConfig but received %d bytes.\n";
+  const char MSG_NODECONFIG_EXPECTED_D[] = "Expected NodeConfig (%d bytes) but received %d bytes.\n";
   const char MSG_SIGNATURE_MISSMATCH[] = "Config received for another signature.\n";
   const char MSG_NEW_CONFIG_DD[] = "New node/feature config received: %d/%d\n";
   const char MSG_RESTART_COMMAND_RECEIVED[] = "Restart command detected\n";
@@ -169,7 +169,8 @@ void setup() {
   
   //Check data if compatible with config
   if(radio.DATALEN != sizeof(NodeConfigCommand) || radio.DATA[0] != (2 + (0 << 2))) {
-    debug_printa(MSG_NODECONFIG_EXPECTED_D, radio.DATALEN);
+    debug_printa(MSG_NODECONFIG_EXPECTED_D, sizeof(NodeConfigCommand), radio.DATALEN);
+    if(radio.ACKRequested()) radio.sendACK();
     delay(1000); resetFunc();
   }
 
@@ -322,13 +323,13 @@ bool WaitRf(int milliseconds) {
     delay(d);
     rd = radio.receiveDone();
   }
-  if(!rd) {
-    debug_print(MSG_NOK);
-    return false;
+  if(rd) {
+    debug_print(MSG_OK);
+    return true;
   }
-  debug_print(MSG_OK);
-  return true;
-}
+  debug_print(MSG_NOK);
+  return false;
+}  
 
 void intTest()
 {
