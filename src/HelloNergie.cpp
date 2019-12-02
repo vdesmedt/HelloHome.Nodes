@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include <SI7021.h>
 #include <LowPower.h>
-#include <RFM69.h>    
 #include <RFM69_OTA.h>
 
 #include <version.h>
@@ -60,7 +59,7 @@
 
 //RFM69
 #define RF_ENCRYPT_KEY  "passiondesfruits"
-#define RF_GTW_NODE_ID  254
+#define RF_GTW_NODE_ID  1
 #define RF_IS_RFM69HW_
 
 //SPIFlash
