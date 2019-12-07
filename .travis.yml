@@ -40,7 +40,7 @@ script:
   - echo ${TRAVIS_BUILD_DIR}/lib/version.h
   - platformio run
 before-deploy:
-  - cp .pioenvs/moteino/firmware.hex .pioenvs/moteino/hellonergie-${shash}.hex
+  - cp .pio/build/moteino/firmware.hex .pioenvs/moteino/hellonergie-${shash}.hex
 deploy:
   provider: releases
   api_key: $GITHUB_TOKEN
