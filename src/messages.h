@@ -3,16 +3,11 @@
 
 #include <Arduino.h>
 
-#define FEAT_SI7021 1
-#define FEAT_BMP    2
-#define FEAT_VIN    4
-#define FEAT_HAL1   8
-#define FEAT_HAL2   16
-#define FEAT_DRY    32
-
-#define PORTNUMBER_HAL1 1
-#define PORTNUMBER_HAL2 2
-#define PORTNUMBER_DRY  3
+#define FEAT_ENV    1
+#define FEAT_BATT   2
+#define FEAT_PULSE1 4
+#define FEAT_PULSE2 8
+#define FEAT_PULSE3 16
 
 typedef struct BaseMessage {
   uint8_t msgType;
@@ -32,6 +27,7 @@ typedef struct NodeInfoReport {
   const uint8_t msgType = RPT + (2 << 2);
   uint16_t sendErrorCount;
   uint16_t vIn;
+  bool dirty = false;
 } NodeInfoReport;
 
 typedef struct EnvironmentReport {
@@ -39,13 +35,17 @@ typedef struct EnvironmentReport {
   int temperature;
   int humidity;
   int pressure;
+  bool dirty = false;
 } EnvironmentReport;
 
 typedef struct PulseReport {
   const uint8_t msgType = RPT + (4 << 2);
-  uint8_t portNumber;
-  uint16_t newPulses;
+  uint16_t newPulses1;
+  uint16_t newPulses2;
+  uint16_t newPulses3;  
+  bool dirty = false;
 } PulseReport;
+
 
 #define CMD 2
 

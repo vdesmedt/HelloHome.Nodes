@@ -35,8 +35,8 @@ install:
   - platformio lib -g install 536
 script:
   - shash=$(echo ${TRAVIS_COMMIT} | cut -c 1-7)
-  - sed -i -e "s/CiSubstErr/${shash}/g" ${TRAVIS_BUILD_DIR}/lib/version.h
-  - sed -i -e "s/51/50/g" ${TRAVIS_BUILD_DIR}/lib/version.h
+  - sed -i -e "s/CiSubstErr/${shash}/g" ${TRAVIS_BUILD_DIR}/src/version.h
+  - sed -i -e "s/51/50/g" ${TRAVIS_BUILD_DIR}/src/version.h
   - echo ${TRAVIS_BUILD_DIR}/lib/version.h
   - platformio run
 before-deploy:

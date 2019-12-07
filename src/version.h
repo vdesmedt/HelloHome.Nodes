@@ -1,2 +1,2 @@
-#define VERSION "CiErr03"
+#define VERSION "CiSubstErr"
 #define RF_NETWORK_ID 50
