@@ -83,6 +83,7 @@
   #define FLASH_SS      8 // and FLASH SS on D8
 #endif
 
+SPIFlash flash(FLASH_SS, 0xEF30); //EF30 for 4mbit  Windbond chip (W25X40CL)
 RFM69 radio;
 SI7021 siSensor;
 
@@ -122,7 +123,6 @@ void setup() {
 
   //Flash initialization
   debug_print(MSG_FLASH_INIT);
-  SPIFlash flash(FLASH_SS, 0xEF30); //EF30 for 4mbit  Windbond chip (W25X40CL)
   if(!flash.initialize()) {
     debug_print(MSG_NOK_RESTART);    
     delay(1000);
@@ -250,6 +250,7 @@ void loop() {
         debug_printa(MSG_UNKNOWN_MSG_TYPE_D, radio.DATA[0]);
         break;
     }
+    CheckForWirelessHEX(radio, flash, true);
     if(radio.ACKRequested())
       radio.sendACK();
   }
