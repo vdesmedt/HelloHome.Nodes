@@ -11,7 +11,7 @@ typedef struct NodeFlashConfig {
 } NodeFlashConfig;
 NodeFlashConfig flashConfig;
 
-bool sendData(const void *data, size_t dataSize, bool sleep = true);
+bool sendData(const void *data, size_t dataSize, bool sleep = false);
 void(* resetFunc) (void) = 0; //declare reset function @ address 0
 void pulse_ISR();
 void radioInit(uint16_t nodeId);
