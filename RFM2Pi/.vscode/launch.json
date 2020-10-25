@@ -12,7 +12,7 @@
             "type": "platformio-debug",
             "request": "launch",
             "name": "PIO Debug",
-            "executable": "/Users/vdesmedt/Projects/HelloHome/HelloHome.Rfm2Pi/.pio/build/moteino/firmware.elf",
+            "executable": "/Users/vdesmedt/Projects/HelloHome/HelloHome.Nodes/RFM2Pi/.pio/build/moteino/firmware.elf",
             "toolchainBinDir": "/Users/vdesmedt/.platformio/packages/toolchain-atmelavr/bin",
             "preLaunchTask": {
                 "type": "PlatformIO",
@@ -24,7 +24,7 @@
             "type": "platformio-debug",
             "request": "launch",
             "name": "PIO Debug (skip Pre-Debug)",
-            "executable": "/Users/vdesmedt/Projects/HelloHome/HelloHome.Rfm2Pi/.pio/build/moteino/firmware.elf",
+            "executable": "/Users/vdesmedt/Projects/HelloHome/HelloHome.Nodes/RFM2Pi/.pio/build/moteino/firmware.elf",
             "toolchainBinDir": "/Users/vdesmedt/.platformio/packages/toolchain-atmelavr/bin",
             "internalConsoleOptions": "openOnSessionStart"
         }

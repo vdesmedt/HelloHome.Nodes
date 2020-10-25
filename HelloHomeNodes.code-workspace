@@ -1,0 +1,25 @@
+{
+  "folders": [
+	{
+		"name": "RFM2Pi",
+		"path": "RFM2Pi"
+	},
+	{
+		"name": "NodeSimulator",
+		"path": "NodeSimulator"
+	},
+	{
+		"name": "HelloNergie",
+		"path": "HelloNergie"
+	},
+	{
+		"name": "SharedLibraries",
+		"path": "SharedLibraries"
+	},
+	{
+		"name": "OTA",
+		"path": "OTA"
+	}
+],
+  "settings": {}
+}
