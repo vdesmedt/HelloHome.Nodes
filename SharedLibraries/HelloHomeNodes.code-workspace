@@ -1,0 +1,20 @@
+{
+  "folders": [
+	{
+		"path": "."
+	},
+	{
+		"path": "../OTA"
+	},
+	{
+		"path": "../RFM2Pi"
+	},
+	{
+		"path": "../NodeSimulator"
+	},
+	{
+		"path": "../HelloNergie"
+	}
+],
+  "settings": {}
+}
