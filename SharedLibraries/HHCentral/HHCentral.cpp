@@ -15,7 +15,7 @@ HHCentral::HHCentral(HHLogger *logger, const char *t_version, enum HHEnv t_envir
     m_environment = t_environment;
 }
 
-HHCErr HHCentral::connect(bool t_highPowerRf)
+HHCErr HHCentral::connect(bool t_highPowerRf, int timeout)
 {
     m_flash = new SPIFlash(FLASH_SS, 0xEF30);
     if (!m_flash->initialize())
@@ -54,9 +54,11 @@ HHCErr HHCentral::connect(bool t_highPowerRf)
     sendData(&nodeStartedMsg, sizeof(NodeStartedReport), false);
 
     //Wait for response (config)
-    if (!waitRf(10000))
+    if (!waitRf(timeout == 0 ? 10000 : timeout))
     {
         m_logger->log(HHL_RESTARTING);
+        if (timeout > 0)
+            return HHCErr_NoResponseFromGateway;
         resetFunc();
     }
 

@@ -38,12 +38,13 @@ enum HHEnv
 typedef short HHCErr;
 #define HHCNoErr 0
 #define HHCErr_FlashInitFailed -1
+#define HHCErr_NoResponseFromGateway -2
 
 class HHCentral
 {
 public:
     HHCentral(HHLogger *logger, const char *t_version, enum HHEnv t_environment);
-    HHCErr connect(bool t_highPowerRf = false);
+    HHCErr connect(bool t_highPowerRf = false, int timeout = 0);
     HHCErr send(Report *report);
     HHCErr send(NodeInfoReport *report);
     Command *check();
