@@ -93,7 +93,7 @@ void setup()
 
     pinMode(LED, OUTPUT);
     hhLogger = new HHLogger(LogMode::Text);
-    hhCentral = new HHCentral(hhLogger, "1234567", HHEnv::Dev);
+    hhCentral = new HHCentral(hhLogger, NodeType::Simulator, "1234567", HHEnv::Dev);
     hhCentral->connect(true);
 
     strcpy(ns_msg.version, "ABC");

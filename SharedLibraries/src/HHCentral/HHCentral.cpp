@@ -8,11 +8,12 @@ void resetFunc()
         ;
 }
 
-HHCentral::HHCentral(HHLogger *logger, const char *t_version, enum HHEnv t_environment)
+HHCentral::HHCentral(HHLogger *logger, enum NodeType t_nodeType, const char *t_version, enum HHEnv t_environment)
 {
     m_logger = logger;
     m_version = t_version;
     m_environment = t_environment;
+    m_nodeType = t_nodeType;
 }
 
 HHCErr HHCentral::connect(bool t_highPowerRf, int timeout)
@@ -49,6 +50,7 @@ HHCErr HHCentral::connect(bool t_highPowerRf, int timeout)
     //Send startup report
     NodeStartedReport nodeStartedMsg;
     nodeStartedMsg.startCount = m_config.startCount;
+    nodeStartedMsg.nodeType = m_nodeType;
     memcpy(nodeStartedMsg.signature, m_flash->UNIQUEID, 8);
     strncpy(nodeStartedMsg.version, m_version, 7);
     sendData(&nodeStartedMsg, sizeof(NodeStartedReport), false);
@@ -56,9 +58,9 @@ HHCErr HHCentral::connect(bool t_highPowerRf, int timeout)
     //Wait for response (config)
     if (!waitRf(timeout == 0 ? 10000 : timeout))
     {
-        m_logger->log(HHL_RESTARTING);
         if (timeout > 0)
             return HHCErr_NoResponseFromGateway;
+        m_logger->log(HHL_RESTARTING);
         resetFunc();
     }
 
@@ -68,6 +70,8 @@ HHCErr HHCentral::connect(bool t_highPowerRf, int timeout)
         m_logger->log(HHL_NODECONFIG_EXPECTED_DD, sizeof(NodeConfigCommand), m_radio->DATALEN);
         if (m_radio->ACKRequested())
             m_radio->sendACK();
+        if (timeout > 0)
+            return HHCErr_DataIsNoConfig;
         resetFunc();
     }
 
@@ -81,6 +85,8 @@ HHCErr HHCentral::connect(bool t_highPowerRf, int timeout)
     if (memcmp((const void *)&receivedConfig.signature, m_flash->UNIQUEID, 8))
     {
         m_logger->log(HHL_SIG_MISMATCH);
+        if (timeout > 0)
+            return HHCErr_SignatureMismatch;
         m_logger->log(HHL_RESTARTING);
         resetFunc();
     }
@@ -118,6 +124,7 @@ HHCErr HHCentral::send(NodeInfoReport *t_report)
 SetRelayStateCommand setRelayStateCmd;
 RestartCommand restartCmd;
 PongCommand pongCommand;
+LxiCommand lxiCommand;
 
 Command *HHCentral::check()
 {
@@ -125,7 +132,7 @@ Command *HHCentral::check()
     if (m_radio->receiveDone())
     {
         m_lastRssi = m_radio->RSSI;
-        m_logger->log("Reiceved :");
+        m_logger->log("Received :");
         for (int i = 0; i < m_radio->DATALEN; i++)
             m_logger->log("%02X-", m_radio->DATA[i]);
         m_logger->log("\n");
@@ -144,6 +151,11 @@ Command *HHCentral::check()
         {
             memcpy(&pongCommand, (const void *)m_radio->DATA, sizeof(PongCommand));
             cmd = &pongCommand;
+        }
+        else if (m_radio->DATA[0] == lxiCommand.msgType)
+        {
+            memcpy(&lxiCommand, (const void *)m_radio->DATA, sizeof(LxiCommand));
+            cmd = &lxiCommand;
         }
         if (m_radio->ACKRequested())
             m_radio->sendACK();

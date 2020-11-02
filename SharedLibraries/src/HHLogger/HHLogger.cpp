@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <Arduino.h>
-#include <HHLogger.h>
+#include "HHLogger.h"
 
 HHLogger::HHLogger(enum LogMode logMode)
 {

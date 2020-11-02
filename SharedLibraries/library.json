@@ -1,0 +1,26 @@
+{
+    "name": "HelloHome Core",
+    "version": "0.9.3",
+    "description": "The core of the HelloHome framework",
+    "keywords": "home, automation",
+    "repository":
+    {
+      "type": "git",
+      "url": "https://github.com/username/hello-world.git"
+    },
+    "authors":
+    [
+      {
+        "name": "Valery De Smedt",
+        "email": "valery@indri.be",
+        "url": "https://www.vdesmedt.com/diy"
+      }
+    ],
+    "license": "MIT",
+    "homepage": "https://www.vdesmedt.com/diy",
+    "dependencies": {
+      
+    },
+    "frameworks": "atmelavr, atmelmegaavr",
+    "platforms": "Arduino"
+  }

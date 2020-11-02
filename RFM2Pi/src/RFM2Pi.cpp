@@ -65,8 +65,9 @@ const char *rptType[] = {
     "PS", //Push button
     "SW", //Switch
     "VR", //Vario
+    "VA", //VoltAmper
 };
-const char *cmdType[] = {"NC", "RS", "RL", "PG"};
+const char *cmdType[] = {"NC", "RS", "RL", "PG", "LX"};
 
 RFM69 radio;
 uint8_t networkId = 0;

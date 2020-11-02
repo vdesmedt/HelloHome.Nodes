@@ -1,8 +1,8 @@
 #ifndef hhcentral_h
 #define hhcentral_h
 
-#include <HhMessages.h>
-#include <HHLogger.h>
+#include "HHMessages/HHMessages.h"
+#include "HHLogger/HHLogger.h"
 #include <RFM69_OTA.h>
 
 #ifdef __AVR_ATmega1284P__
@@ -35,21 +35,33 @@ enum HHEnv
     Pro
 };
 
+enum NodeType
+{
+    Default = 0,
+    HelloNergie = 1,
+    ElectronicLoad = 98,
+    Simulator = 99,
+
+};
+
 typedef short HHCErr;
 #define HHCNoErr 0
 #define HHCErr_FlashInitFailed -1
 #define HHCErr_NoResponseFromGateway -2
+#define HHCErr_DataIsNoConfig -3
+#define HHCErr_SignatureMismatch -4
 
 class HHCentral
 {
 public:
-    HHCentral(HHLogger *logger, const char *t_version, enum HHEnv t_environment);
+    HHCentral(HHLogger *logger, enum NodeType t_nodeType, const char *t_version, enum HHEnv t_environment);
     HHCErr connect(bool t_highPowerRf = false, int timeout = 0);
     HHCErr send(Report *report);
     HHCErr send(NodeInfoReport *report);
     Command *check();
     uint16_t sendErrorCount();
     int16_t LastRssi() { return m_lastRssi; };
+    uint16_t NodeId() { return m_config.nodeId; };
 
 private:
     bool sendData(const void *data, size_t dataSize, bool sleep);
@@ -62,6 +74,7 @@ private:
     SPIFlash *m_flash;
     const char *m_version;
     int16_t m_lastRssi;
+    enum NodeType m_nodeType = NodeType::Default;
 };
 
 #endif
