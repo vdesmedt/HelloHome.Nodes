@@ -90,23 +90,21 @@ int screenLogIndex = 0;
 
 void addToScreenLog(const char *log);
 bool draw(void);
-bool readDipSwitches();
 
 void setup()
 {
+  Serial.begin(SERIAL_BAUD);
+  while (!Serial)
+    ;
+
   pinMode(PIN_HW, INPUT_PULLUP);
   pinMode(PIN_PRO, INPUT_PULLUP);
   pinMode(LED, OUTPUT);
-  readDipSwitches();
 
   radio.initialize(RF69_868MHZ, NODEID, networkId);
   radio.encrypt(ENCRYPTKEY);
   radio.setHighPower(rfm69_hw);
-  snprintf(netId, 20, "%s-%s [%s]", rfm69_hw ? "HW" : "W", networkId == 50 ? "50(DEV)" : "51(PRO)", VERSION);
-
-  Serial.begin(SERIAL_BAUD);
-  while (!Serial)
-    ;
+  snprintf(netId, 20, "%s-%i(%s) [%s]", rfm69_hw ? "HW" : "W", networkId, networkId == 50 ? "DEV" : networkId == 51 ? "PRO" : "???", VERSION);
 
   ssd1306_128x64_i2c_init();
   ssd1306_fillScreen(0x00);
@@ -134,7 +132,7 @@ void loop()
 
     Serial.write(serOutBuffer, serOutBufferLength);
     Serial.println("");
-    snprintf(screenLogLine, 20, "< %s %03hu %d ", rptType[serOutData->message[0] >> 2], serOutData->srcNode, serOutData->rssi);
+    snprintf(screenLogLine, 20, "<%s %03hu %d ", rptType[serOutData->message[0] >> 2], serOutData->srcNode, serOutData->rssi);
     addToScreenLog(screenLogLine);
     digitalWrite(LED, LOW);
     serOutBufferLength = 0;
@@ -145,49 +143,49 @@ void loop()
     serInBuffer[serInBufferLength++] = Serial.read();
     if (serInBufferLength >= 2 && serInBuffer[serInBufferLength - 2] == 13 && serInBuffer[serInBufferLength - 1] == 10)
     {
-      digitalWrite(LED, HIGH);
-      bool success = radio.sendWithRetry(serInData->destNode, serInData->message, serInData->msgLength, 3, 40);
-      digitalWrite(LED, LOW);
+      if (serInData->destNode == 1 && serInData->message[0] == 18)
+      {
+        networkId = serInData->message[1];
+        radio.setNetwork(networkId);
+        rfm69_hw = serInData->message[2] > 0;
+        radio.setHighPower(rfm69_hw);
+        snprintf(netId, 20, "%s-%i(%s) [%s]", rfm69_hw ? "HW" : "W", networkId, networkId == 50 ? "DEV" : networkId == 51 ? "PRO" : "?", VERSION);
 
-      //Log
-      snprintf(screenLogLine, 20, "%s %s %03hu %03d", success ? ">" : "x", cmdType[serInData->message[0] >> 2], serInData->destNode, success ? radio.RSSI : 0);
-      addToScreenLog(screenLogLine);
+        //Report to Gateway
+        serOutData->srcNode = NODEID;
+        serOutData->rssi = 0;
+        serOutData->message[0] = 0xFF;
+        memcpy((serOutData->message) + 1, &(serInData->messageId), 2);
+        serOutData->message[3] = 1;
+        Serial.write(serOutBuffer, 8);
+        Serial.println("");
+        Serial.flush();
+        serInBufferLength = 0;
+      }
+      else
+      {
+        digitalWrite(LED, HIGH);
+        bool success = radio.sendWithRetry(serInData->destNode, serInData->message, serInData->msgLength, 3, 40);
+        digitalWrite(LED, LOW);
 
-      //Report to Gateway
-      serOutData->srcNode = NODEID;
-      serOutData->rssi = success ? radio.RSSI : 0;
-      serOutData->message[0] = 0xFF;
-      memcpy((serOutData->message) + 1, &(serInData->messageId), 2);
-      serOutData->message[3] = success ? 1 : 0;
-      Serial.write(serOutBuffer, 8);
-      Serial.println("");
-      Serial.flush();
-      serInBufferLength = 0;
+        //Log
+        snprintf(screenLogLine, 20, "%s%s %03hu %03d", success ? ">" : "x", cmdType[serInData->message[0] >> 2], serInData->destNode, success ? radio.RSSI : 0);
+        addToScreenLog(screenLogLine);
+
+        //Report to Gateway
+        serOutData->srcNode = NODEID;
+        serOutData->rssi = success ? radio.RSSI : 0;
+        serOutData->message[0] = 0xFF;
+        memcpy((serOutData->message) + 1, &(serInData->messageId), 2);
+        serOutData->message[3] = success ? 1 : 0;
+        Serial.write(serOutBuffer, 8);
+        Serial.println("");
+        Serial.flush();
+        serInBufferLength = 0;
+      }
     }
   }
-
-  //Detect dip switch changes
-  if (readDipSwitches())
-  {
-    radio.setNetwork(networkId);
-    radio.setHighPower(rfm69_hw);
-    snprintf(netId, 20, "%s-%s [%s]", rfm69_hw ? "HW" : "W", networkId == 50 ? "50(DEV)" : "51(PRO)", VERSION);
-  }
   draw();
-}
-
-bool readDipSwitches()
-{
-  uint8_t nnid = digitalRead(PIN_PRO) == LOW ? 51 : 50;
-  bool nhw = digitalRead(PIN_HW) == LOW;
-  if (nnid != networkId || nhw != rfm69_hw)
-  {
-    delay(50); //Debounce
-    networkId = digitalRead(PIN_PRO) == LOW ? 51 : 50;
-    rfm69_hw = digitalRead(PIN_HW) == LOW;
-    return true;
-  }
-  return false;
 }
 
 void addToScreenLog(const char *log)
