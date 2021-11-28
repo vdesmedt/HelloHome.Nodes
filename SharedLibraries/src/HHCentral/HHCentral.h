@@ -1,15 +1,13 @@
 #ifndef hhcentral_h
 #define hhcentral_h
 
-#include "HHMessages/HHMessages.h"
-#include "HHLogger/HHLogger.h"
+#include "HHMessages.h"
+#include "HHLogger.h"
 #include <RFM69_OTA.h>
 
 #ifdef __AVR_ATmega1284P__
-#define LED 15      // Moteino MEGAs have LEDs on D15
 #define FLASH_SS 23 // and FLASH SS on D23
 #else
-#define LED 9      // Moteinos have LEDs on D9
 #define FLASH_SS 8 // and FLASH SS on D8
 #endif
 
