@@ -60,6 +60,7 @@ public:
     uint16_t sendErrorCount();
     int16_t LastRssi() { return m_lastRssi; };
     uint16_t NodeId() { return m_config.nodeId; };
+    uint16_t Features() { return m_config.features; }
 
 private:
     bool sendData(const void *data, size_t dataSize, bool sleep);
