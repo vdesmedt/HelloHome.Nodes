@@ -10,7 +10,6 @@
 #include <MemoryFree.h>
 #include <OneButton.h>
 
-#define LED 9
 #define P_PUSH A0
 #define P_PUSH_LED A1
 #define P_LCD_DC 5
