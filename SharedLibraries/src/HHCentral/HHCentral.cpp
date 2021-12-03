@@ -8,15 +8,16 @@ void resetFunc()
         ;
 }
 
-HHCentral::HHCentral(HHLogger *logger, enum NodeType t_nodeType, const char *t_version, enum HHEnv t_environment)
+HHCentral::HHCentral(HHLogger *logger, enum NodeType t_nodeType, const char *t_version, enum HHEnv t_environment, bool t_highPower)
 {
     m_logger = logger;
     m_version = t_version;
     m_environment = t_environment;
     m_nodeType = t_nodeType;
+    m_highPower = t_highPower;
 }
 
-HHCErr HHCentral::connect(bool t_highPowerRf, int timeout)
+HHCErr HHCentral::connect(int timeout)
 {
     m_flash = new SPIFlash(FLASH_SS, 0xEF30);
     if (!m_flash->initialize())
@@ -43,12 +44,13 @@ HHCErr HHCentral::connect(bool t_highPowerRf, int timeout)
     uint8_t networkId = m_environment == HHEnv::Pro ? 51 : 50;
     m_radio->initialize(RF69_868MHZ, m_config.nodeId, networkId);
     m_radio->encrypt(RF_ENCRYPT_KEY);
-    if (t_highPowerRf)
+    if (m_highPower)
         m_radio->setHighPower();
-    m_logger->log(HHL_RF_INIT_UUS, m_config.nodeId, networkId, t_highPowerRf ? "HW" : "H");
+    m_logger->log(HHL_RF_INIT_UUS, m_config.nodeId, networkId, m_highPower ? "HW" : "H");
 
     //Send startup report
     NodeStartedReport nodeStartedMsg;
+    nodeStartedMsg.msgId = msgId++;
     nodeStartedMsg.startCount = m_config.startCount;
     nodeStartedMsg.nodeType = m_nodeType;
     memcpy(nodeStartedMsg.signature, m_flash->UNIQUEID, 8);
@@ -108,15 +110,23 @@ HHCErr HHCentral::connect(bool t_highPowerRf, int timeout)
     return HHCNoErr;
 }
 
-int msgSizes[] = {sizeof(PingReport), sizeof(NodeStartedReport), sizeof(NodeInfoReport), sizeof(EnvironmentReport), sizeof(PulseReport), sizeof(PushButtonPressedReport), sizeof(SwitchActivatedReport), sizeof(VarioLevelChangedReport)};
-HHCErr HHCentral::send(Report *t_report)
+HHCErr HHCentral::send(NodeInfoReport *t_report)
 {
-    sendData(t_report, msgSizes[t_report->msgType >> 2], false);
+    t_report->msgId = msgId++;
+    sendData(t_report, sizeof(*t_report), false);
     return HHCNoErr;
 }
 
-HHCErr HHCentral::send(NodeInfoReport *t_report)
+HHCErr HHCentral::send(EnvironmentReport *t_report)
 {
+    t_report->msgId = msgId++;
+    sendData(t_report, sizeof(*t_report), false);
+    return HHCNoErr;
+}
+
+HHCErr HHCentral::send(PulseReport *t_report)
+{
+    t_report->msgId = msgId++;
     sendData(t_report, sizeof(*t_report), false);
     return HHCNoErr;
 }
@@ -131,6 +141,7 @@ Command *HHCentral::check()
     Command *cmd = nullptr;
     if (m_radio->receiveDone())
     {
+        CheckForWirelessHEX(*m_radio, *m_flash, false);
         m_lastRssi = m_radio->RSSI;
         m_logger->log("Received :");
         for (int i = 0; i < m_radio->DATALEN; i++)
@@ -171,7 +182,7 @@ Command *HHCentral::check()
 bool HHCentral::sendData(const void *data, size_t dataSize, bool sleep)
 {
     digitalWrite(LED, HIGH);
-    m_logger->log(HHL_SEND_MSG_D, ((uint8_t *)data)[0]);
+    m_logger->log(HHL_SEND_MSG_D, ((uint8_t *)data)[0], ((uint8_t*)data)[1]);
     bool success = m_radio->sendWithRetry(RF_GTW_NODE_ID, data, dataSize, 3, 40);
     if (success)
     {

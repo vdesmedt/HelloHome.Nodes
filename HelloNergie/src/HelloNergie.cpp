@@ -2,20 +2,18 @@
 #include <LowPower.h>
 #include <RFM69_OTA.h>
 #include "SparkFunBME280.h"
-#include <EmonLib.h>
 
 #include <version.h>
-#include <HhMessages.h>
-#include <HelloNergie.h>
 #include <HHCentral.h>
+#include <HHMessages.h>
 
-//RFM69
-#define RF_ENCRYPT_KEY "passiondesfruits"
-#define RF_GTW_NODE_ID 1
-#define RF_IS_RFM69HW_
+//Features
+#define FEAT_ENV 1
+#define FEAT_BATT 2
+#define FEAT_HAL1 4
+#define FEAT_HAL2 8
+#define FEAT_DRY1 16
 
-//SPIFlash
-#define FLASH_ADR 0x20000 //First memory availble after reserved for OTA update
 
 //Battery
 #define VIN_TRIGGER 15
@@ -23,361 +21,164 @@
 #define VIN_RATIO 2.0 //(4.7 + 4.7) / 4.7
 #define VIN_VREF 3.3
 
-//HAL and DRY contact
-#define PULSE_PIN1 4
-#define PULSE_PIN2 5
-#define PULSE_PIN3 6
+//HAL and DRY contact (Normally High, Fall on detect)
+#define HAL1_PIN 4
+#define HAL2_PIN 5
+#define DRY1_PIN 6
 #define MIN_PULSE_INTERVAL 200
 
-//ELEC POWER
-bool CT_1_Enabled = false;
-#define CT_1 A6
-bool CT_2_Enabled = false;
-#define CT_2 A7
+volatile uint8_t newPulse[] = {0, 0, 0};
+volatile bool newPulses = false;
 
-#define AUTO_DETECT_SIG 7
+HHLogger *logger;
+HHCentral *hhCentral;
 
-SPIFlash flash(FLASH_SS, 0xEF30); //EF30 for 4mbit  Windbond chip (W25X40CL)
-RFM69 radio;
-EnergyMonitor emon1;
-EnergyMonitor emon2;
+PulseReport pulseReportHal1, pulseReportHal2, pulseReportDry1;
+EnvironmentReport envReport;
+NodeInfoReport nodeReport;
+#ifdef RELEASE
+#define NODE_INFO_PERIOD 60UL * 60UL * 1000UL
+#else
+#define NODE_INFO_PERIOD 5UL * 1000UL
+#endif
+
 BME280 bmeSensor;
 
-uint8_t newPulse[3] = {0, 0, 0};
-unsigned long lastPulse[3] = {0, 0, 0};
-bool newPulses = false;
+uint16_t features;
 
-bool displayOn = false;
-
-PulseReport pulseMsg;
-NodeInfoReport nodeInfoMsg;
-EnvironmentReport envMsg;
-
-char floatv[10];
+void pulse_ISR();
 
 void setup()
 {
-#ifdef DEBUG
   Serial.begin(115200);
-  while (!Serial)
-    delay(10);
-#endif
+  #ifdef RELEASE
+    logger = new HHLogger(LogMode::Off);
+    hhCentral = new HHCentral(logger, NodeType::HelloNergie, "1.0", HHEnv::Pro, true);
+  #else
+    logger = new HHLogger(LogMode::Text);
+    hhCentral = new HHCentral(logger, NodeType::HelloNergie, "1.0", HHEnv::Dev, true);
+  #endif
+  HHCErr err = hhCentral->connect();
+  if(err != HHCNoErr)
+    logger->log("HHCentral connection issue : %d\n", err);
 
-  //Flash initialization
-  debug_print(MSG_FLASH_INIT);
-  if (!flash.initialize())
-  {
-    debug_print(MSG_NOK_RESTART);
-    delay(1000);
-    resetFunc();
-  }
-  else
-  {
-    debug_print(MSG_OK);
-  }
-  //Retreive unique Id from flash
-  flash.readUniqueId();
-
-  //Read & Update config (start count)
-  debug_print(MSG_READ_CONFIG);
-  flash.readBytes(FLASH_ADR, &flashConfig, sizeof(NodeFlashConfig));
-  flashConfig.startCount++;
-  if (CONFIG_VERSION != flashConfig.confVer)
-  {
-    debug_print(MSG_NOCONFIG_OR_NEWVERSION);
-    //First read or new version
-    flashConfig.confVer = CONFIG_VERSION;
-    flashConfig.features = 0;
-    flashConfig.nodeId = 253;
-    flashConfig.startCount = 1;
-    flashConfig.environmentFreq = 0;
-    flashConfig.nodeInfoFreq = 0;
-  }
-  else
-  {
-    debug_printa(MSG_CONFIG_FOUND, flashConfig.nodeId);
-  }
-
-  //Init radio
-  radioInit(flashConfig.nodeId);
-
-  //Send startup report
-  NodeStartedReport nodeStartedMsg;
-  nodeStartedMsg.startCount = flashConfig.startCount;
-  strncpy(nodeStartedMsg.version, VERSION, 7);
-  memcpy(nodeStartedMsg.signature, flash.UNIQUEID, 8);
-  sendData(&nodeStartedMsg, sizeof(NodeStartedReport), false);
-
-  //Wait for response (config)
-  if (!WaitRf(10000))
-  {
-    debug_print(MSG_NOK_RESTART);
-    delay(1000);
-    resetFunc();
-  }
-
-  //Check data if compatible with config
-  if (radio.DATALEN != sizeof(NodeConfigCommand) || radio.DATA[0] != (2 + (0 << 2)))
-  {
-    debug_printa(MSG_NODECONFIG_EXPECTED_D, sizeof(NodeConfigCommand), radio.DATALEN);
-    if (radio.ACKRequested())
-      radio.sendACK();
-    delay(1000);
-    resetFunc();
-  }
-
-  //Put response in config struct & ack
-  NodeConfigCommand receivedConfig;
-  memcpy(&receivedConfig, (const void *)radio.DATA, sizeof(NodeConfigCommand));
-  if (radio.ACKRequested())
-    radio.sendACK();
-
-  //Check config is for right node by testing signature
-  if (memcmp((const void *)&receivedConfig.signature, flash.UNIQUEID, 8))
-  {
-    debug_print(MSG_SIGNATURE_MISSMATCH);
-    debug_print(MSG_NOK_RESTART);
-    delay(1000);
-    resetFunc();
-  }
-
-  //Update flash config if needed (nodeId or features)
-  if (flashConfig.nodeId != receivedConfig.newNodeId || flashConfig.features != receivedConfig.features)
-  {
-    debug_printa(MSG_NEW_CONFIG_DD, flashConfig.nodeId, flashConfig.features);
-    flashConfig.nodeId = receivedConfig.newNodeId;
-    radio.setAddress(flashConfig.nodeId);
-    flashConfig.features = receivedConfig.features;
-  }
-  flashConfig.nodeInfoFreq = receivedConfig.nodeInfoFreq;
-  flashConfig.environmentFreq = receivedConfig.environmentFreq;
-  flash.blockErase4K(FLASH_ADR);
-  flash.writeBytes(FLASH_ADR, &flashConfig, sizeof(NodeFlashConfig));
-  debug_printa(MSG_SAVED_CONFIG_DDDDDD, flashConfig.confVer, flashConfig.features, flashConfig.nodeId, flashConfig.startCount, flashConfig.nodeInfoFreq, flashConfig.environmentFreq);
 
   //Configure Pin
   pinMode(3, INPUT_PULLUP); //Interrupt
+  features = hhCentral->Features();
 
-  if (receivedConfig.features & FEAT_BATT)
+  if (features & FEAT_BATT)
   {
-    debug_print(MSG_BATT_ENABLED);
+    logger->log("Battmon enabled \n");
     pinMode(VIN_TRIGGER, OUTPUT);
     pinMode(VIN_MEASURE, INPUT);
   }
-  if (receivedConfig.features & FEAT_PULSE1)
+  if (features & FEAT_HAL1)
   {
-    debug_printa(MSG_PULSE_ENABLED, 1);
-    pinMode(PULSE_PIN1, INPUT_PULLUP);
+    logger->log("HAL1 Enabled\n");
+    pinMode(HAL1_PIN, INPUT_PULLUP);
   }
-  if (receivedConfig.features & FEAT_PULSE2)
+  if (features & FEAT_HAL2)
   {
-    debug_printa(MSG_PULSE_ENABLED, 2);
-    pinMode(PULSE_PIN2, INPUT_PULLUP);
+    logger->log("HAL2 Enabled\n");
+    pinMode(HAL2_PIN, INPUT_PULLUP);
   }
-  if (receivedConfig.features & FEAT_PULSE3)
+  if (features & FEAT_DRY1)
   {
-    debug_printa(MSG_PULSE_ENABLED, 3);
-    pinMode(PULSE_PIN3, INPUT_PULLUP);
-  }
-
-  //Configure energieMonitor
-  pinMode(CT_1, INPUT);
-  if (analogRead(CT_1) > 0)
-  {
-    CT_1_Enabled = true;
-    emon1.current(CT_1, 83.37);
-    debug_print("CT1 Enabled\n");
-  }
-
-  pinMode(CT_2, INPUT);
-  if (analogRead(CT_2) > 0)
-  {
-    CT_2_Enabled = true;
-    emon2.current(CT_2, 83.37);
-    debug_print("CT2 Enabled\n");
+    logger->log("DRY1 Enabled");
+    pinMode(DRY1_PIN, INPUT_PULLUP);
   }
 
   //Initialize SI7021 sensor if feature enabled
-  if (receivedConfig.features & FEAT_ENV)
+  if (features & FEAT_ENV)
   {
     bmeSensor.setI2CAddress(0x76);
     bmeSensor.beginI2C();
-    debug_print(MSG_ENV_ENABLED);
+    logger->log("BME Enabled");
   }
 
   //Initialize messages
-  pulseMsg.newPulses1 = pulseMsg.newPulses2 = pulseMsg.newPulses3 = 0;
-  envMsg.temperature = envMsg.humidity = envMsg.pressure = 0;
-  nodeInfoMsg.sendErrorCount = nodeInfoMsg.vIn = 0;
+  pulseReportHal1.newPulses = pulseReportHal2.newPulses = pulseReportDry1.newPulses = 0;
+  pulseReportHal1.isOffset = pulseReportHal2.isOffset = pulseReportDry1.isOffset = false;
+  pulseReportHal1.portNumber = 10;
+  pulseReportHal2.portNumber = 11;
+  pulseReportDry1.portNumber = 12;
+
+  envReport.temperature = envReport.humidity = envReport.pressure = 0;
+  nodeReport.sendErrorCount = nodeReport.vIn = 0;
 
   attachInterrupt(digitalPinToInterrupt(3), pulse_ISR, FALLING);
 }
 
 void loop()
 {
-  //Check if message for rf message
-  if (radio.receiveDone())
-  {
-    switch (radio.DATA[0])
-    {
-    case 6:
-      debug_print(MSG_RESTART_COMMAND_RECEIVED);
-      if (radio.ACKRequested())
-        radio.sendACK();
-      delay(100);
-      resetFunc();
-      break;
-    default:
-      debug_printa(MSG_UNKNOWN_MSG_TYPE_D, radio.DATA[0]);
-      break;
-    }
-    CheckForWirelessHEX(radio, flash, true);
-    if (radio.ACKRequested())
-      radio.sendACK();
-  }
-
+  hhCentral->check();
   //Check on pulse counters
-  detachInterrupt(digitalPinToInterrupt(3));
   if (newPulses)
   {
-    pulseMsg.newPulses1 += newPulse[0];
-    pulseMsg.newPulses2 += newPulse[1];
-    pulseMsg.newPulses3 += newPulse[2];
+    detachInterrupt(digitalPinToInterrupt(3));
+    pulseReportHal1.newPulses += newPulse[0];
+    pulseReportHal2.newPulses += newPulse[1];
+    pulseReportDry1.newPulses += newPulse[2];
     newPulse[0] = newPulse[1] = newPulse[2] = 0;
     newPulses = false;
-    pulseMsg.dirty = true;
-    debug_printa("New pulses %d %d %d\n", pulseMsg.newPulses1, pulseMsg.newPulses2, pulseMsg.newPulses3);
-  }
-  attachInterrupt(digitalPinToInterrupt(3), pulse_ISR, FALLING);
-
-  //Calculate Temperature and Humidity every environmentFreq wakeup
-  static unsigned long lastEnv = 0;
-  if (flashConfig.features & FEAT_ENV && flashConfig.environmentFreq > 0 && lastEnv + 1000 * flashConfig.environmentFreq < millis())
-  {
-    lastEnv = millis();
-    envMsg.temperature = bmeSensor.readTempC() * 100.0;
-    envMsg.humidity = bmeSensor.readFloatHumidity() * 100.0;
-    envMsg.pressure = bmeSensor.readFloatPressure() / 10;
-    envMsg.dirty = true;
-    debug_printa(" BME: %d C / %d %% / %d Hg\n", envMsg.temperature, envMsg.humidity, envMsg.pressure);
+    attachInterrupt(digitalPinToInterrupt(3), pulse_ISR, FALLING);
+    logger->log("New pulses %d %d %d\n", pulseReportHal1.newPulses, pulseReportHal2.newPulses, pulseReportDry1.newPulses);
   }
 
   //Measure battery voltage
   static unsigned long lastNodeInf = 0;
-  if (flashConfig.features & FEAT_BATT && flashConfig.nodeInfoFreq > 0 && lastNodeInf + 1000 * flashConfig.nodeInfoFreq < millis())
+  if ((millis() - lastNodeInf > NODE_INFO_PERIOD))
   {
     lastNodeInf = millis();
-    digitalWrite(VIN_TRIGGER, LOW);
-    nodeInfoMsg.vIn = ((1.0 * analogRead(VIN_MEASURE)) / 1024.0 * VIN_VREF * VIN_RATIO) * 100;
-    digitalWrite(VIN_TRIGGER, HIGH);
-    debug_printa(" VIN: %d\n", nodeInfoMsg.vIn);
-    nodeInfoMsg.dirty = true;
-  }
-
-  //Current Sensor
-  if (CT_1_Enabled)
-  {
-    double Irms = emon1.calcIrms(1480); // Calculate Irms only
-    debug_printa(" %s A -> %d W\n", dtostrf(Irms, 4, 2, floatv), (int)(Irms * 230));
-  }
-
-  //Send dirty messages
-  if (pulseMsg.dirty)
-  {
-    if (sendData(&pulseMsg, sizeof(PulseReport) - 1))
+    if(features & FEAT_BATT)
     {
-      pulseMsg.newPulses1 = pulseMsg.newPulses2 = pulseMsg.newPulses3 = 0;
-      pulseMsg.dirty = false;
+      digitalWrite(VIN_TRIGGER, LOW);
+      nodeReport.vIn = ((double)analogRead(VIN_MEASURE) / 1023.0) * VIN_VREF * VIN_RATIO * 100.0;
+      digitalWrite(VIN_TRIGGER, HIGH);
     }
-  }
-  if (envMsg.dirty)
-  {
-    if (sendData(&envMsg, sizeof(EnvironmentReport) - 1))
+    else
     {
-      envMsg.dirty = false;
+      nodeReport.vIn = 0;
     }
+    nodeReport.sendErrorCount = hhCentral->sendErrorCount();
+    hhCentral->send(&nodeReport);
   }
-  if (nodeInfoMsg.dirty)
-  {
-    if (sendData(&nodeInfoMsg, sizeof(NodeInfoReport) - 1))
-    {
-      nodeInfoMsg.dirty = false;
-    }
+  if(pulseReportHal1.newPulses > 0) {
+    hhCentral->send(&pulseReportHal1);
+    pulseReportHal1.newPulses = 0;
   }
-}
-
-void radioInit(uint16_t nodeId)
-{
-  //Initialize Radio
-  radio.initialize(RF69_868MHZ, nodeId, RF_NETWORK_ID);
-  radio.encrypt(RF_ENCRYPT_KEY);
-#ifdef RF_IS_RFM69HW
-  radio.setHighPower();
-  debug_printa(MSG_RF_INIT_DDS, nodeId, RF_NETWORK_ID, "HW");
-#else
-  debug_printa(MSG_RF_INIT_DDS, nodeId, RF_NETWORK_ID, "W");
-#endif
-}
-
-bool WaitRf(int milliseconds)
-{
-  int d = 100;
-  int retryCount = milliseconds / d;
-  debug_print(MSG_WAIT_RF);
-  bool rd = radio.receiveDone();
-  while (!rd && retryCount-- > 0)
-  {
-    debug_print(".");
-    delay(d);
-    rd = radio.receiveDone();
+  if(pulseReportHal2.newPulses > 0) {
+    hhCentral->send(&pulseReportHal2);
+    pulseReportHal2.newPulses = 0;
   }
-  if (rd)
-  {
-    debug_print(MSG_OK);
-    return true;
+  if(pulseReportDry1.newPulses > 0) {
+    hhCentral->send(&pulseReportDry1);
+    pulseReportDry1.newPulses = 0;
   }
-  debug_print(MSG_NOK);
-  return false;
 }
 
 void pulse_ISR()
 {
-  if (flashConfig.features & FEAT_PULSE1 && digitalRead(PULSE_PIN1) == LOW)
+  static unsigned long lastPulseMillis[] { 0, 0, 0 };
+  unsigned long now = millis();
+
+  if (features & FEAT_HAL1 && digitalRead(HAL1_PIN) == LOW && now - lastPulseMillis[0] > MIN_PULSE_INTERVAL)
   {
     newPulse[0]++;
     newPulses = true;
+    lastPulseMillis[0] = now;
   }
-  if (flashConfig.features & FEAT_PULSE2 && digitalRead(PULSE_PIN2) == LOW)
+  if (features & FEAT_HAL2 && digitalRead(HAL2_PIN) == LOW && now - lastPulseMillis[1] > MIN_PULSE_INTERVAL)
   {
     newPulse[1]++;
     newPulses = true;
+    lastPulseMillis[1] = now;
   }
-  if (flashConfig.features & FEAT_PULSE3 && digitalRead(PULSE_PIN3) == LOW)
+  if (features & FEAT_DRY1 && digitalRead(DRY1_PIN) == LOW && now - lastPulseMillis[2] > MIN_PULSE_INTERVAL)
   {
     newPulse[2]++;
     newPulses = true;
+    lastPulseMillis[2] = now;
   }
-}
-
-bool sendData(const void *data, size_t dataSize, bool sleep)
-{
-  digitalWrite(LED, HIGH);
-  debug_printa(MSG_SEND_MSG_D, ((uint8_t *)data)[0]);
-  bool success = radio.sendWithRetry(RF_GTW_NODE_ID, data, dataSize, 3, 40);
-  if (success)
-  {
-    debug_print(MSG_OK);
-  }
-  else
-  {
-    debug_print(MSG_NOK);
-    nodeInfoMsg.sendErrorCount++;
-  }
-  if (sleep)
-  {
-    debug_print("Radio goes to sleep\n");
-    radio.sleep();
-  }
-  digitalWrite(LED, LOW);
-  return success;
 }

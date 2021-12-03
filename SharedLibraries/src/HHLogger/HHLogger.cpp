@@ -20,7 +20,7 @@ HHLogger::HHLogger(enum LogMode logMode)
         m_msg[HHL_OK] = PSTR("OK\n");
         m_msg[HHL_NOK] = PSTR("NOK\n");
         m_msg[HHL_RADIO_SLEEP] = PSTR("Radio -> Sleep\n");
-        m_msg[HHL_SEND_MSG_D] = PSTR("Will send Msg (%d)...");
+        m_msg[HHL_SEND_MSG_D] = PSTR("Will send Msg (%d) with msgId(%d)...");
         m_msg[HHL_WAIT_RF] = PSTR("Waiting for RF response");
         m_msg[HHL_RPT_RECEIVED] = PSTR("Report received (%d)\n");
     }

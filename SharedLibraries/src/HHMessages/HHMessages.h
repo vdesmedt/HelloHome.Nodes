@@ -3,12 +3,6 @@
 
 #include <Arduino.h>
 
-#define FEAT_ENV 1
-#define FEAT_BATT 2
-#define FEAT_PULSE1 4
-#define FEAT_PULSE2 8
-#define FEAT_PULSE3 16
-
 struct BaseMessage
 {
     uint8_t msgType;
@@ -16,6 +10,7 @@ struct BaseMessage
 
 struct Report : BaseMessage
 {
+    uint8_t msgId;
 };
 
 struct Command : BaseMessage
@@ -38,7 +33,7 @@ struct PingReport : Report
 {
     PingReport()
     {
-        msgType = RPT_PING;
+        msgType = RPT_PING;        
     }
     uint32_t millis;
 };

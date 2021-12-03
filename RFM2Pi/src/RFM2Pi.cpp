@@ -143,7 +143,7 @@ void loop()
     serInBuffer[serInBufferLength++] = Serial.read();
     if (serInBufferLength >= 2 && serInBuffer[serInBufferLength - 2] == 13 && serInBuffer[serInBufferLength - 1] == 10)
     {
-      if (serInData->destNode == 1 && serInData->message[0] == 18)
+      if (serInData->destNode == 1 && serInData->message[0] == 18) //Radio Config
       {
         networkId = serInData->message[1];
         radio.setNetwork(networkId);

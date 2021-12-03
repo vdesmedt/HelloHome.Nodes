@@ -52,12 +52,13 @@ typedef short HHCErr;
 class HHCentral
 {
 public:
-    HHCentral(HHLogger *logger, enum NodeType t_nodeType, const char *t_version, enum HHEnv t_environment);
-    HHCErr connect(bool t_highPowerRf = false, int timeout = 0);
-    HHCErr send(Report *report);
+    HHCentral(HHLogger *logger, enum NodeType t_nodeType, const char *t_version, enum HHEnv t_environment, bool t_highPower = true);
+    HHCErr connect(int timeout = 0);
     HHCErr send(NodeInfoReport *report);
+    HHCErr send(EnvironmentReport *report);
+    HHCErr send(PulseReport *report);
     Command *check();
-    uint16_t sendErrorCount();
+    uint16_t sendErrorCount() { return m_sendErrorCount; };
     int16_t LastRssi() { return m_lastRssi; };
     uint16_t NodeId() { return m_config.nodeId; };
     uint16_t Features() { return m_config.features; }
@@ -66,6 +67,7 @@ private:
     bool sendData(const void *data, size_t dataSize, bool sleep);
     bool waitRf(int milliseconds);
     enum HHEnv m_environment = HHEnv::Dev;
+    bool m_highPower = true;
     uint16_t m_sendErrorCount = 0;
     HHLogger *m_logger;
     NodeConfig m_config;
@@ -74,6 +76,7 @@ private:
     const char *m_version;
     int16_t m_lastRssi;
     enum NodeType m_nodeType = NodeType::Default;
+    uint8_t msgId = 12;
 };
 
 #endif
