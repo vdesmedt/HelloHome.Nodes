@@ -39,7 +39,7 @@ NodeInfoReport nodeReport;
 #ifdef RELEASE
 #define NODE_INFO_PERIOD 60UL * 60UL * 1000UL
 #else
-#define NODE_INFO_PERIOD 5UL * 1000UL
+#define NODE_INFO_PERIOD 30UL * 1000UL
 #endif
 
 BME280 bmeSensor;
@@ -53,10 +53,10 @@ void setup()
   Serial.begin(115200);
   #ifdef RELEASE
     logger = new HHLogger(LogMode::Off);
-    hhCentral = new HHCentral(logger, NodeType::HelloNergie, "1.0", HHEnv::Pro, true);
+    hhCentral = new HHCentral(logger, NodeType::HelloNergie, GIT_FLAG, HHEnv::Pro, true);
   #else
     logger = new HHLogger(LogMode::Text);
-    hhCentral = new HHCentral(logger, NodeType::HelloNergie, "1.0", HHEnv::Dev, true);
+    hhCentral = new HHCentral(logger, NodeType::HelloNergie, GIT_FLAG, HHEnv::Dev, false);
   #endif
   HHCErr err = hhCentral->connect();
   if(err != HHCNoErr)
