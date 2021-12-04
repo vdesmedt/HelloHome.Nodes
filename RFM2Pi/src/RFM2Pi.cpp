@@ -112,7 +112,7 @@ void setup()
   radio.initialize(RF69_868MHZ, NODEID, networkId);
   radio.encrypt(ENCRYPTKEY);
   radio.setHighPower(rfm69_hw);
-  snprintf(netId, 20, "%s-%i(%s) [%s]", rfm69_hw ? "HW" : "W", networkId, networkId == 50 ? "DEV" : networkId == 51 ? "PRO" : "???", VERSION);
+  snprintf(netId, 20, "%s%i(%s) [%s]", rfm69_hw ? "HW" : " W", networkId, networkId == 50 ? "DEV" : networkId == 51 ? "PRO" : "???", GIT_FLAG);
 
   ssd1306_128x64_i2c_init();
   ssd1306_fillScreen(0x00);
@@ -157,7 +157,7 @@ void loop()
         radio.setNetwork(networkId);
         rfm69_hw = serInData->message[2] > 0;
         radio.setHighPower(rfm69_hw);
-        snprintf(netId, 20, "%s-%i(%s) [%s]", rfm69_hw ? "HW" : "W", networkId, networkId == 50 ? "DEV" : networkId == 51 ? "PRO" : "?", VERSION);
+        snprintf(netId, 20, "%s%i(%s) [%s]", rfm69_hw ? "HW" : " W", networkId, networkId == 50 ? "DEV" : networkId == 51 ? "PRO" : "???", GIT_FLAG);
 
         //Report to Gateway
         serOutData->srcNode = NODEID;
@@ -211,7 +211,7 @@ bool draw(void)
     return false;
 
   ssd1306_printFixed(0, 0, netId, STYLE_NORMAL);
-  ssd1306_printFixed(0, 8, "      d mt rfi rss", STYLE_NORMAL);
+  ssd1306_printFixed(0, 8, "       mt adr rss", STYLE_NORMAL);
 
   int logIndex = 0;
   for (logIndex = 1; logIndex <= LOGSIZE; logIndex++)
