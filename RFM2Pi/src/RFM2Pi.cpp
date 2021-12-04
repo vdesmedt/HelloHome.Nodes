@@ -66,8 +66,16 @@ const char *rptType[] = {
     "SW", //Switch
     "VR", //Vario
     "VA", //VoltAmper
+    "PG", //Pong
 };
-const char *cmdType[] = {"NC", "RS", "RL", "PG", "LX"};
+const char *cmdType[] = {
+    "NC", //Node Config
+    "RS", //Reset
+    "RL", //Relay
+    "PG", //Ping
+    "LX", //Lxi
+    "PG", //Pong
+};
 
 RFM69 radio;
 uint8_t networkId = 0;

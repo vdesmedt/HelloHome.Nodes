@@ -135,6 +135,7 @@ SetRelayStateCommand setRelayStateCmd;
 RestartCommand restartCmd;
 PongCommand pongCommand;
 LxiCommand lxiCommand;
+PingCommand pingCommand;
 
 Command *HHCentral::check()
 {
@@ -168,12 +169,26 @@ Command *HHCentral::check()
             memcpy(&lxiCommand, (const void *)m_radio->DATA, sizeof(LxiCommand));
             cmd = &lxiCommand;
         }
+        else if (m_radio->DATA[0] == pingCommand.msgType)
+        {
+            memcpy(&pingCommand, (const void *)m_radio->DATA, sizeof(PingCommand));
+            cmd = &pingCommand;
+        }
         if (m_radio->ACKRequested())
             m_radio->sendACK();
         if (cmd == &restartCmd)
         {
             m_logger->log(HHL_RESTARTING);
             resetFunc();
+        }
+        else if (cmd == &pingCommand)
+        {
+            PongReport pongReport;
+            pongReport.msgId = msgId++;
+            pongReport.millisIn = pingCommand.millis;
+            pongReport.millisOut = millis();
+            pongReport.pingRssi = m_radio->RSSI;
+            sendData(&pongReport, sizeof(pongReport), false);
         }
     }
     return cmd;

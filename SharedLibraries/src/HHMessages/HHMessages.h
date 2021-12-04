@@ -28,6 +28,7 @@ struct Command : BaseMessage
 #define RPT_VARIO RPT + (7 << 2)
 #define RPT_POWER RPT + (8 << 2)
 #define RPT_VALOG RPT + (9 << 2)
+#define RPT_PONG RPT + (10 << 2)
 
 struct PingReport : Report
 {
@@ -135,8 +136,19 @@ struct VoltAmperReport : Report
     {
         msgType = RPT_VALOG;
     }
-    int16_t Tension;
-    int16_t Current;
+    int16_t tension;
+    int16_t current;
+};
+
+struct PongReport :  Report
+{
+    PongReport()
+    {
+        msgType = RPT_PONG;
+    }
+    uint32_t millisIn;
+    uint32_t millisOut;
+    int16_t pingRssi;
 };
 
 #define CMD 2
@@ -145,6 +157,7 @@ struct VoltAmperReport : Report
 #define CMD_SETRELAY CMD + (2 << 2)
 #define CMD_PONG CMD + (3 << 2)
 #define CMD_LXI CMD + (4 << 2)
+#define CMD_PING CMD + (5 << 2)
 
 struct NodeConfigCommand : Command
 {
@@ -184,7 +197,7 @@ struct PongCommand : Command
         msgType = CMD_PONG;
     }
     uint32_t millis;
-    int16_t PingRssi;
+    int16_t pingRssi;
 };
 
 struct LxiCommand : Command
@@ -194,6 +207,15 @@ struct LxiCommand : Command
         msgType = CMD_LXI;
     }
     char Command[20];
+};
+
+struct PingCommand : Command
+{
+    PingCommand()
+    {
+        msgType = CMD_PING;
+    }
+    uint32_t millis;
 };
 
 #endif
