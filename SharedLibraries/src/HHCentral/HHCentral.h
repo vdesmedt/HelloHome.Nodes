@@ -48,6 +48,7 @@ typedef short HHCErr;
 #define HHCErr_NoResponseFromGateway -2
 #define HHCErr_DataIsNoConfig -3
 #define HHCErr_SignatureMismatch -4
+#define HHCErr_SendFailed -5
 
 class HHCentral
 {

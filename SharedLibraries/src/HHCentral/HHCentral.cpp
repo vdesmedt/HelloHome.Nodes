@@ -113,22 +113,22 @@ HHCErr HHCentral::connect(int timeout)
 HHCErr HHCentral::send(NodeInfoReport *t_report)
 {
     t_report->msgId = msgId++;
-    sendData(t_report, sizeof(*t_report), false);
-    return HHCNoErr;
+    bool success = sendData(t_report, sizeof(*t_report), false);
+    return success ? HHCNoErr : HHCErr_SendFailed;
 }
 
 HHCErr HHCentral::send(EnvironmentReport *t_report)
 {
     t_report->msgId = msgId++;
-    sendData(t_report, sizeof(*t_report), false);
-    return HHCNoErr;
+    bool success = sendData(t_report, sizeof(*t_report), false);
+    return success ? HHCNoErr : HHCErr_SendFailed;
 }
 
 HHCErr HHCentral::send(PulseReport *t_report)
 {
     t_report->msgId = msgId++;
-    sendData(t_report, sizeof(*t_report), false);
-    return HHCNoErr;
+    bool success = sendData(t_report, sizeof(*t_report), false);
+    return success ? HHCNoErr : HHCErr_SendFailed;
 }
 
 SetRelayStateCommand setRelayStateCmd;

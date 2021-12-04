@@ -145,16 +145,19 @@ void loop()
     hhCentral->send(&nodeReport);
   }
   if(pulseReportHal1.newPulses > 0) {
-    hhCentral->send(&pulseReportHal1);
-    pulseReportHal1.newPulses = 0;
+    if(HHCNoErr == hhCentral->send(&pulseReportHal1)) {
+      pulseReportHal1.newPulses = 0;
+    }
   }
   if(pulseReportHal2.newPulses > 0) {
-    hhCentral->send(&pulseReportHal2);
-    pulseReportHal2.newPulses = 0;
+    if(HHCNoErr == hhCentral->send(&pulseReportHal2)) {
+      pulseReportHal2.newPulses = 0;
+    }
   }
   if(pulseReportDry1.newPulses > 0) {
-    hhCentral->send(&pulseReportDry1);
-    pulseReportDry1.newPulses = 0;
+    if(HHCNoErr == hhCentral->send(&pulseReportDry1)) {
+      pulseReportDry1.newPulses = 0;
+    }
   }
 }
 
