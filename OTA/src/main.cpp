@@ -49,6 +49,7 @@
 #define FREQUENCY_DEFAULT  915000000
 #define VALID_FREQUENCY(freq) ((freq >= 430000000 && freq <= 435000000) || (freq >= 860000000 && freq <= 870000000) || (freq >= 902000000 && freq <= 928000000))
 #define ENCRYPTKEY_DEFAULT ""
+#define IS_RFM69HW_HCW
 //*********************************************************************************************
 #define DEBUG_MODE  false  //'true' = verbose output from programming sequence, ~12% slower OTA!
 #define SERIAL_BAUD 115200
