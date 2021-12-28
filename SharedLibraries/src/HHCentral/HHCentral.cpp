@@ -174,13 +174,20 @@ Command *HHCentral::check()
             memcpy(&pingCommand, (const void *)m_radio->DATA, sizeof(PingCommand));
             cmd = &pingCommand;
         }
-        if (m_radio->ACKRequested())
+
+        //Acknowledge
+        if (m_radio->ACKRequested()) {
             m_radio->sendACK();
+            m_logger->log("ACK Sent");
+        }
+
+        //Restart ?
         if (cmd == &restartCmd)
         {
             m_logger->log(HHL_RESTARTING);
             resetFunc();
         }
+        //Ping ?
         else if (cmd == &pingCommand)
         {
             PongReport pongReport;
