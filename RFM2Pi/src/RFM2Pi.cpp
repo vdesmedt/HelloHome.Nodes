@@ -77,6 +77,18 @@ const char *cmdType[] = {
     "PG", //Pong
 };
 
+const uint8_t Heart [] PROGMEM = {
+0b00000000,
+0b00011100,
+0b01111110,
+0b11111100,
+0b01111110,
+0b00011100,
+0b00000000,
+0b00000000,
+};
+
+
 RFM69 radio;
 uint8_t networkId = 0;
 bool rfm69_hw = false;
@@ -87,6 +99,7 @@ struct HHCOutput *serOutData = (struct HHCOutput *)serOutBuffer;
 char serInBuffer[100];
 uint8_t serInBufferLength = 0;
 struct HHCInput *serInData = (struct HHCInput *)serInBuffer;
+unsigned long lastHaertBeat = millis();
 
 //Logging
 char netId[20]; //Node identification to be displayed
@@ -151,24 +164,31 @@ void loop()
     serInBuffer[serInBufferLength++] = Serial.read();
     if (serInBufferLength >= 2 && serInBuffer[serInBufferLength - 2] == 13 && serInBuffer[serInBufferLength - 1] == 10)
     {
-      if (serInData->destNode == 1 && serInData->message[0] == 18) //Radio Config
+      //Format  {MsgId:2}{DestNode:2}{msgLen:1}{Message:1-64} 0A 0D
+      if (serInData->destNode == 1)
       {
-        networkId = serInData->message[1];
-        radio.setNetwork(networkId);
-        rfm69_hw = serInData->message[2] > 0;
-        radio.setHighPower(rfm69_hw);
-        snprintf(netId, 20, "%s%i(%s) [%s]", rfm69_hw ? "HW" : " W", networkId, networkId == 50 ? "DEV" : networkId == 51 ? "PRO" : "???", GIT_FLAG);
+        if( serInData->message[0] == 26) //HeartBeat
+        {
+          lastHaertBeat = millis();
+        }
+        else if( serInData->message[0] == 18) //Radio Config
+        {
+          networkId = serInData->message[1];
+          radio.setNetwork(networkId);
+          rfm69_hw = serInData->message[2] > 0;
+          radio.setHighPower(rfm69_hw);
+          snprintf(netId, 20, "%s%i(%s) [%s]", rfm69_hw ? "HW" : " W", networkId, networkId == 50 ? "DEV" : networkId == 51 ? "PRO" : "???", GIT_FLAG);
 
-        //Report to Gateway
-        serOutData->srcNode = NODEID;
-        serOutData->rssi = 0;
-        serOutData->message[0] = 0xFF;
-        memcpy((serOutData->message) + 1, &(serInData->messageId), 2);
-        serOutData->message[3] = 1;
-        Serial.write(serOutBuffer, 8);
-        Serial.println("");
-        Serial.flush();
-        serInBufferLength = 0;
+          //Report to Gateway
+          serOutData->srcNode = NODEID;
+          serOutData->rssi = 0;
+          serOutData->message[0] = 0xFF;
+          memcpy((serOutData->message) + 1, &(serInData->messageId), 2);
+          serOutData->message[3] = 1; //Success
+          Serial.write(serOutBuffer, 8);
+          Serial.println("");
+          Serial.flush();
+        }        
       }
       else
       {
@@ -189,11 +209,15 @@ void loop()
         Serial.write(serOutBuffer, 8);
         Serial.println("");
         Serial.flush();
-        serInBufferLength = 0;
       }
+      serInBufferLength = 0;
     }
   }
   draw();
+  if(lastHaertBeat + 5000 < millis())
+  {
+    digitalWrite(LED, millis()/500 % 2);
+  }
 }
 
 void addToScreenLog(const char *log)
@@ -204,13 +228,36 @@ void addToScreenLog(const char *log)
 }
 
 unsigned long lastPrint = millis();
+bool HeartShown = false;
 bool draw(void)
 {
+  if(!HeartShown && lastHaertBeat+200 > millis())
+  {
+
+    ssd1306_drawBitmap(120,0,8,8, Heart);
+    HeartShown = true;
+  } 
+  else if(HeartShown && lastHaertBeat+200 <= millis())
+  {
+    ssd1306_clearBlock(120,0,8,8);
+    HeartShown = false;
+  }
+  
   //Draw only every 500ms
   if (millis() - lastPrint < 1000)
     return false;
 
-  ssd1306_printFixed(0, 0, netId, STYLE_NORMAL);
+  if(lastHaertBeat + 5000 < millis())
+  {
+    if(millis()/1000 % 2 == 0)
+      ssd1306_printFixed(0,0,"No HeartBeat !!!!!!", STYLE_NORMAL);
+    else
+      ssd1306_printFixed(0,0,"                   ", STYLE_NORMAL);
+  } 
+  else
+  {
+    ssd1306_printFixed(0, 0, netId, STYLE_NORMAL);
+  }
   ssd1306_printFixed(0, 8, "       mt adr rss", STYLE_NORMAL);
 
   int logIndex = 0;
