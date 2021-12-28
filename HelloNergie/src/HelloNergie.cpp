@@ -7,21 +7,20 @@
 #include <HHCentral.h>
 #include <HHMessages.h>
 
-//Features
+// Features
 #define FEAT_ENV 1
 #define FEAT_BATT 2
 #define FEAT_HAL1 4
 #define FEAT_HAL2 8
 #define FEAT_DRY1 16
 
-
-//Battery
+// Battery
 #define VIN_TRIGGER 15
 #define VIN_MEASURE A0
 #define VIN_RATIO 2.0 //(4.7 + 4.7) / 4.7
 #define VIN_VREF 3.3
 
-//HAL and DRY contact (Normally High, Fall on detect)
+// HAL and DRY contact (Normally High, Fall on detect)
 #define HAL1_PIN 4
 #define HAL2_PIN 5
 #define DRY1_PIN 6
@@ -38,8 +37,10 @@ EnvironmentReport envReport;
 NodeInfoReport nodeReport;
 #ifdef RELEASE
 #define NODE_INFO_PERIOD 60UL * 60UL * 1000UL
+#define NODE_PULSE_PERIOD 60UL * 1000UL
 #else
 #define NODE_INFO_PERIOD 30UL * 1000UL
+#define NODE_PULSE_PERIOD 05UL * 1000UL
 #endif
 
 BME280 bmeSensor;
@@ -51,20 +52,19 @@ void pulse_ISR();
 void setup()
 {
   Serial.begin(115200);
-  #ifdef RELEASE
-    logger = new HHLogger(LogMode::Off);
-    hhCentral = new HHCentral(logger, NodeType::HelloNergie, GIT_FLAG, HHEnv::Pro, true);
-  #else
-    logger = new HHLogger(LogMode::Text);
-    hhCentral = new HHCentral(logger, NodeType::HelloNergie, GIT_FLAG, HHEnv::Dev, false);
-  #endif
+#ifdef RELEASE
+  logger = new HHLogger(LogMode::Off);
+  hhCentral = new HHCentral(logger, NodeType::HelloNergie, GIT_FLAG, HHEnv::Pro, true);
+#else
+  logger = new HHLogger(LogMode::Text);
+  hhCentral = new HHCentral(logger, NodeType::HelloNergie, GIT_FLAG, HHEnv::Dev, true);
+#endif
   HHCErr err = hhCentral->connect();
-  if(err != HHCNoErr)
+  if (err != HHCNoErr)
     logger->log("HHCentral connection issue : %d\n", err);
 
-
-  //Configure Pin
-  pinMode(3, INPUT_PULLUP); //Interrupt
+  // Configure Pin
+  pinMode(3, INPUT_PULLUP); // Interrupt
   features = hhCentral->Features();
 
   if (features & FEAT_BATT)
@@ -89,7 +89,7 @@ void setup()
     pinMode(DRY1_PIN, INPUT_PULLUP);
   }
 
-  //Initialize SI7021 sensor if feature enabled
+  // Initialize SI7021 sensor if feature enabled
   if (features & FEAT_ENV)
   {
     bmeSensor.setI2CAddress(0x76);
@@ -97,7 +97,7 @@ void setup()
     logger->log("BME Enabled");
   }
 
-  //Initialize messages
+  // Initialize messages
   pulseReportHal1.newPulses = pulseReportHal2.newPulses = pulseReportDry1.newPulses = 0;
   pulseReportHal1.isOffset = pulseReportHal2.isOffset = pulseReportDry1.isOffset = false;
   pulseReportHal1.portNumber = 10;
@@ -113,7 +113,7 @@ void setup()
 void loop()
 {
   hhCentral->check();
-  //Check on pulse counters
+  // Check on pulse counters
   if (newPulses)
   {
     detachInterrupt(digitalPinToInterrupt(3));
@@ -126,12 +126,12 @@ void loop()
     logger->log("New pulses %d %d %d\n", pulseReportHal1.newPulses, pulseReportHal2.newPulses, pulseReportDry1.newPulses);
   }
 
-  //Measure battery voltage
-  static unsigned long lastNodeInf = 0;
-  if ((millis() - lastNodeInf > NODE_INFO_PERIOD))
+  // Measure battery voltage
+  static unsigned long lastNodeInfoSent = 0;
+  if (millis() - lastNodeInfoSent > NODE_INFO_PERIOD)
   {
-    lastNodeInf = millis();
-    if(features & FEAT_BATT)
+    lastNodeInfoSent = millis();
+    if (features & FEAT_BATT)
     {
       digitalWrite(VIN_TRIGGER, LOW);
       nodeReport.vIn = ((double)analogRead(VIN_MEASURE) / 1023.0) * VIN_VREF * VIN_RATIO * 100.0;
@@ -144,26 +144,34 @@ void loop()
     nodeReport.sendErrorCount = hhCentral->sendErrorCount();
     hhCentral->send(&nodeReport);
   }
-  if(pulseReportHal1.newPulses > 0) {
-    if(HHCNoErr == hhCentral->send(&pulseReportHal1)) {
+
+  static unsigned long lastPulseSent = 0;
+  if (millis() - lastPulseSent > NODE_PULSE_PERIOD)
+  {
+    bool pulseSent = false;
+    if (pulseReportHal1.newPulses > 0 && HHCNoErr == hhCentral->send(&pulseReportHal1))
+    {
+      pulseSent = true;
       pulseReportHal1.newPulses = 0;
     }
-  }
-  if(pulseReportHal2.newPulses > 0) {
-    if(HHCNoErr == hhCentral->send(&pulseReportHal2)) {
+    if (pulseReportHal2.newPulses > 0 && HHCNoErr == hhCentral->send(&pulseReportHal2))
+    {
+      pulseSent = true;
       pulseReportHal2.newPulses = 0;
     }
-  }
-  if(pulseReportDry1.newPulses > 0) {
-    if(HHCNoErr == hhCentral->send(&pulseReportDry1)) {
+    if (pulseReportDry1.newPulses > 0 && HHCNoErr == hhCentral->send(&pulseReportDry1))
+    {
+      pulseSent = true;
       pulseReportDry1.newPulses = 0;
     }
+    if (pulseSent)
+      lastPulseSent = millis();
   }
 }
 
 void pulse_ISR()
 {
-  static unsigned long lastPulseMillis[] { 0, 0, 0 };
+  static unsigned long lastPulseMillis[]{0, 0, 0};
   unsigned long now = millis();
 
   if (features & FEAT_HAL1 && digitalRead(HAL1_PIN) == LOW && now - lastPulseMillis[0] > MIN_PULSE_INTERVAL)
