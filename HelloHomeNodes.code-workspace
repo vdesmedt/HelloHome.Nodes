@@ -19,6 +19,10 @@
 	{
 		"name": "OTA",
 		"path": "OTA"
+	},
+	{
+		"name": "NodeConfigurator",
+		"path": "NodeConfigurator"
 	}
 ],
   "settings": {}
