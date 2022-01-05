@@ -36,11 +36,13 @@ PulseReport pulseReportHal1, pulseReportHal2, pulseReportDry1;
 EnvironmentReport envReport;
 NodeInfoReport nodeReport;
 #ifdef RELEASE
-#define NODE_INFO_PERIOD 60UL * 60UL * 1000UL
-#define NODE_PULSE_PERIOD 60UL * 1000UL
+#define NODE_INFO_PERIOD  1000UL * 60UL * 60UL
+#define NODE_PULSE_PERIOD 1000UL * 60UL 
+#define NODE_ENV_PERIOD   1000UL * 60UL * 10UL
 #else
-#define NODE_INFO_PERIOD 30UL * 1000UL
-#define NODE_PULSE_PERIOD 05UL * 1000UL
+#define NODE_INFO_PERIOD  1000UL * 07UL
+#define NODE_PULSE_PERIOD 1000UL * 03UL 
+#define NODE_ENV_PERIOD   1000UL * 05UL 
 #endif
 
 BME280 bmeSensor;
@@ -52,6 +54,7 @@ void pulse_ISR();
 void setup()
 {
   Serial.begin(115200);
+  Wire.begin();
 #ifdef RELEASE
   logger = new HHLogger(LogMode::Off);
   hhCentral = new HHCentral(logger, NodeType::HelloNergie, GIT_FLAG, HHEnv::Pro, true);
@@ -85,16 +88,23 @@ void setup()
   }
   if (features & FEAT_DRY1)
   {
-    logger->log("DRY1 Enabled");
+    logger->log("DRY1 Enabled\n");
     pinMode(DRY1_PIN, INPUT_PULLUP);
   }
 
-  // Initialize SI7021 sensor if feature enabled
+  // Initialize BE280 sensor if feature enabled
   if (features & FEAT_ENV)
   {
     bmeSensor.setI2CAddress(0x76);
-    bmeSensor.beginI2C();
-    logger->log("BME Enabled");
+    if(bmeSensor.beginI2C()) 
+    {
+      logger->log("BME Enabled\n");
+    }
+    else 
+    {
+      features = features & ~FEAT_ENV;
+      logger->log("BME Init Failed. Feature disabled.\n");
+    }    
   }
 
   // Initialize messages
@@ -133,7 +143,7 @@ void loop()
     lastNodeInfoSent = millis();
     if (features & FEAT_BATT)
     {
-      digitalWrite(VIN_TRIGGER, LOW);
+      digitalWrite(VIN_TRIGGER, LOW);      
       nodeReport.vIn = ((double)analogRead(VIN_MEASURE) / 1023.0) * VIN_VREF * VIN_RATIO * 100.0;
       digitalWrite(VIN_TRIGGER, HIGH);
     }
@@ -145,6 +155,7 @@ void loop()
     hhCentral->send(&nodeReport);
   }
 
+  //Send new pulses
   static unsigned long lastPulseSent = 0;
   if (millis() - lastPulseSent > NODE_PULSE_PERIOD)
   {
@@ -166,6 +177,19 @@ void loop()
     }
     if (pulseSent)
       lastPulseSent = millis();
+  }
+
+  //Send environment values
+  static unsigned long lastEnvSent = 0;
+  if(features & FEAT_ENV &&  millis() - lastEnvSent > NODE_ENV_PERIOD)
+  {
+    BME280_SensorMeasurements *measures = new BME280_SensorMeasurements();
+    bmeSensor.readAllMeasurements(measures, 0);
+    envReport.humidity = measures->humidity * 100;
+    envReport.pressure = (unsigned int)(measures->pressure/10);
+    envReport.temperature  = measures->temperature * 100;
+    hhCentral->send(&envReport);
+    lastEnvSent = millis();  //Does not retry every loop if failing...
   }
 }
 
