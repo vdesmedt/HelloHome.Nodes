@@ -58,6 +58,7 @@ public:
     HHCErr send(NodeInfoReport *report);
     HHCErr send(EnvironmentReport *report);
     HHCErr send(PulseReport *report);
+    HHCErr send(VoltAmperReport *report);
     Command *check();
     uint16_t sendErrorCount() { return m_sendErrorCount; };
     int16_t LastRssi() { return m_lastRssi; };
