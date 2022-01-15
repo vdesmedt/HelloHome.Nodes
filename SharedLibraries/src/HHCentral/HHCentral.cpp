@@ -55,7 +55,7 @@ HHCErr HHCentral::connect(int timeout)
     nodeStartedMsg.nodeType = m_nodeType;
     memcpy(nodeStartedMsg.signature, m_flash->UNIQUEID, 8);
     strncpy(nodeStartedMsg.version, m_version, 7);
-    sendData(&nodeStartedMsg, sizeof(NodeStartedReport), false);
+    sendData(&nodeStartedMsg, sizeof(NodeStartedReport));
 
     //Wait for response (config)
     if (!waitRf(timeout == 0 ? 10000 : timeout))
@@ -113,28 +113,28 @@ HHCErr HHCentral::connect(int timeout)
 HHCErr HHCentral::send(NodeInfoReport *t_report)
 {
     t_report->msgId = msgId++;
-    bool success = sendData(t_report, sizeof(*t_report), false);
+    bool success = sendData(t_report, sizeof(*t_report));
     return success ? HHCNoErr : HHCErr_SendFailed;
 }
 
 HHCErr HHCentral::send(EnvironmentReport *t_report)
 {
     t_report->msgId = msgId++;
-    bool success = sendData(t_report, sizeof(*t_report), false);
+    bool success = sendData(t_report, sizeof(*t_report));
     return success ? HHCNoErr : HHCErr_SendFailed;
 }
 
 HHCErr HHCentral::send(PulseReport *t_report)
 {
     t_report->msgId = msgId++;
-    bool success = sendData(t_report, sizeof(*t_report), false);
+    bool success = sendData(t_report, sizeof(*t_report));
     return success ? HHCNoErr : HHCErr_SendFailed;
 }
 
 HHCErr HHCentral::send(VoltAmperReport *t_report)
 {
     t_report->msgId = msgId++;
-    bool success = sendData(t_report, sizeof(*t_report), false);
+    bool success = sendData(t_report, sizeof(*t_report));
     return success ? HHCNoErr : HHCErr_SendFailed;
 }
 
@@ -202,13 +202,13 @@ Command *HHCentral::check()
             pongReport.millisIn = pingCommand.millis;
             pongReport.millisOut = millis();
             pongReport.pingRssi = m_radio->RSSI;
-            sendData(&pongReport, sizeof(pongReport), false);
+            sendData(&pongReport, sizeof(pongReport));
         }
     }
     return cmd;
 }
 
-bool HHCentral::sendData(const void *data, size_t dataSize, bool sleep)
+bool HHCentral::sendData(const void *data, size_t dataSize)
 {
     digitalWrite(LED, HIGH);
     m_logger->log(HHL_SEND_MSG_D, ((uint8_t *)data)[0], ((uint8_t*)data)[1]);
@@ -222,7 +222,7 @@ bool HHCentral::sendData(const void *data, size_t dataSize, bool sleep)
         m_logger->log(HHL_NOK);
         m_sendErrorCount++;
     }
-    if (sleep)
+    if (m_sleepAfterSend)
     {
         m_logger->log(HHL_RADIO_SLEEP);
         m_radio->sleep();

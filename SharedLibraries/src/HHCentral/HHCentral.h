@@ -64,12 +64,14 @@ public:
     int16_t LastRssi() { return m_lastRssi; };
     uint16_t NodeId() { return m_config.nodeId; };
     uint16_t Features() { return m_config.features; }
+    void setRadioToSleepAfterSend() { m_sleepAfterSend = true; }
 
 private:
-    bool sendData(const void *data, size_t dataSize, bool sleep);
+    bool sendData(const void *data, size_t dataSize);
     bool waitRf(int milliseconds);
     enum HHEnv m_environment = HHEnv::Dev;
     bool m_highPower = true;
+    bool m_sleepAfterSend = false;
     uint16_t m_sendErrorCount = 0;
     HHLogger *m_logger;
     NodeConfig m_config;
