@@ -3,7 +3,6 @@
 #include <RFM69_OTA.h>
 #include "SparkFunBME280.h"
 
-#include <version.h>
 #include <HHCentral.h>
 #include <HHMessages.h>
 
