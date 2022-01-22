@@ -37,6 +37,7 @@ enum NodeType
 {
     Default = 0,
     HelloNergie = 1,
+    HelloWeather = 2,
     ElectronicLoad = 98,
     Simulator = 99,
 
@@ -64,8 +65,7 @@ public:
     int16_t LastRssi() { return m_lastRssi; };
     uint16_t NodeId() { return m_config.nodeId; };
     uint16_t Features() { return m_config.features; }
-    void setRadioToSleepAfterSend() { m_sleepAfterSend = true; }
-
+    void setRadioToSleepAfterSend() { m_sleepAfterSend = true; }    
 private:
     bool sendData(const void *data, size_t dataSize);
     bool waitRf(int milliseconds);

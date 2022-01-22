@@ -17,6 +17,12 @@ HHCentral::HHCentral(HHLogger *logger, enum NodeType t_nodeType, const char *t_v
     m_highPower = t_highPower;
 }
 
+//Initialize config from Flash (if present)
+//Initialize Radio with config from flash or dfazult (NodeId 253)
+//Connect to HelloHome Gateway (Send Startup)
+//Retrieve Config (including NodeId)
+//Store config in flash
+//Puts flash asleep
 HHCErr HHCentral::connect(int timeout)
 {
     m_flash = new SPIFlash(FLASH_SS, 0xEF30);
@@ -105,8 +111,9 @@ HHCErr HHCentral::connect(int timeout)
     m_config.environmentFreq = receivedConfig.environmentFreq;
     m_flash->blockErase4K(FLASH_ADR);
     m_flash->writeBytes(FLASH_ADR, &m_config, sizeof(NodeConfig));
+    while(m_flash->busy());
+    m_flash->sleep();
     m_logger->log(HHL_SAVED_CONFIG_DDDDDD, m_config.confVer, m_config.features, m_config.nodeId, m_config.startCount, m_config.nodeInfoFreq, m_config.environmentFreq);
-
     return HHCNoErr;
 }
 
@@ -224,8 +231,8 @@ bool HHCentral::sendData(const void *data, size_t dataSize)
     }
     if (m_sleepAfterSend)
     {
-        m_logger->log(HHL_RADIO_SLEEP);
         m_radio->sleep();
+        m_logger->log(HHL_RADIO_SLEEP);
     }
     digitalWrite(LED, LOW);
     return success;
