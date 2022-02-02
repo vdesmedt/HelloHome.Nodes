@@ -16,10 +16,11 @@
 #define RF_IS_RFM69H
 
 #define FLASH_ADR 0x20000
+#define FLASH_ADR_CONFIG 0x8000 // First 0 -> 0x7FFF (32768Kb) used for Dualoptiboot
 #define CONFIG_VERSION 1
 struct NodeConfig
 {
-    uint8_t confVer; //Config version, used to understand is what is read from flash is ok
+    uint8_t confVer; // Config version, used to understand is what is read from flash is ok
     uint16_t nodeId;
     uint16_t features;
     uint16_t startCount;
@@ -51,6 +52,27 @@ typedef short HHCErr;
 #define HHCErr_SignatureMismatch -4
 #define HHCErr_SendFailed -5
 
+typedef enum HHRegister
+{
+    NetworkId = 1,
+    NodeId = 2,
+    HighPower = 3,
+    NodeInfoPeriod = 10,
+    EnvironmentFreq = 20,
+} HHRegister;
+
+struct HHRegisterValue
+{
+public:
+    HHRegister reg;
+    int16_t getValue() { return m_value; };
+    void setValue(int16_t value) { m_value = value; };
+    HHRegisterValue *next;
+
+private:
+    int16_t m_value;
+};
+
 class HHCentral
 {
 public:
@@ -64,8 +86,13 @@ public:
     uint16_t sendErrorCount() { return m_sendErrorCount; };
     int16_t LastRssi() { return m_lastRssi; };
     uint16_t NodeId() { return m_config.nodeId; };
-    uint16_t Features() { return m_config.features; }
-    void setRadioToSleepAfterSend() { m_sleepAfterSend = true; }    
+    uint16_t Features() { return m_config.features; };
+    void setRadioToSleepAfterSend() { m_sleepAfterSend = true; };
+
+    int16_t getRegisterValue(HHRegister reg);
+    void setRegisterValue(HHRegister reg, int16_t value);
+    void saveRegisterToFlash();
+
 private:
     bool sendData(const void *data, size_t dataSize);
     bool waitRf(int milliseconds);
@@ -81,6 +108,9 @@ private:
     int16_t m_lastRssi;
     enum NodeType m_nodeType = NodeType::Default;
     uint8_t msgId = 12;
+    bool m_configLoaded = false;
+    HHRegisterValue *m_registers = null;
+    HHRegisterValue *findRegisterValue(HHRegister reg, int16_t defaultValue = 0);
 };
 
 #endif

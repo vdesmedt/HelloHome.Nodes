@@ -258,3 +258,74 @@ bool HHCentral::waitRf(int milliseconds)
     m_logger->log(HHL_NOK);
     return false;
 }
+
+HHRegisterValue* HHCentral::findRegisterValue(HHRegister reg, int16_t defaultValue) {
+    HHRegisterValue *p = m_registers;
+    HHRegisterValue *prev = m_registers;
+    while(null !=p && p->reg != reg)
+    {
+        prev = p;
+        p = p->next;
+    }
+    if(null == p) {
+        p  = new HHRegisterValue();
+        p->reg = reg;
+        p->next = null;
+        p->setValue(defaultValue);
+        if(null != prev) {
+            prev->next = p;
+        }
+        else {
+            m_registers = p;
+        }
+        return p;
+    }
+    return p;
+}
+
+int16_t HHCentral::getRegisterValue(HHRegister reg) 
+{
+    if(!m_configLoaded) 
+    {
+        char sig[4];
+        m_flash->readBytes(FLASH_ADR_CONFIG, sig, 4);
+        if(0 == memcmp(sig, "HHCF", 4)) {
+            uint32_t adr = FLASH_ADR_CONFIG + 4;
+            m_registers = new HHRegisterValue();
+            HHRegisterValue *p = m_registers;        
+            while(null != p)
+            {
+                m_flash->readBytes(adr, p, sizeof(HHRegisterValue));
+                adr += sizeof(HHRegisterValue);
+                if(null != p->next)
+                    p->next = new HHRegisterValue();
+                p = p->next;
+            }
+        }
+        m_configLoaded = true;
+    }
+    HHRegisterValue *r = findRegisterValue(reg, 0);
+    return r->getValue();
+}
+
+void HHCentral::setRegisterValue(HHRegister reg, int16_t value)
+{
+    HHRegisterValue *r = findRegisterValue(reg, 0);
+    r->setValue(value);
+}
+
+void HHCentral::saveRegisterToFlash() {
+    if(null == m_registers)
+        return;
+    m_flash->blockErase4K(FLASH_ADR_CONFIG);
+    while(m_flash->busy());
+    m_flash->writeBytes(FLASH_ADR_CONFIG, "HHCF", 4);
+    HHRegisterValue *p = m_registers;
+    uint32_t adr = FLASH_ADR_CONFIG + 4;
+    while(null != p)
+    {
+        m_flash->writeBytes(adr, p, sizeof(HHRegisterValue));
+        adr += sizeof(HHRegisterValue);
+        p = p->next;
+    }
+}
