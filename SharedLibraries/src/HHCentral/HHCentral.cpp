@@ -117,33 +117,17 @@ HHCErr HHCentral::connect(int timeout)
     return HHCNoErr;
 }
 
-HHCErr HHCentral::send(NodeInfoReport *t_report)
+template <typename T> HHCErr HHCentral::send(T* t_report)
 {
     t_report->msgId = msgId++;
-    bool success = sendData(t_report, sizeof(*t_report));
-    return success ? HHCNoErr : HHCErr_SendFailed;
+    bool success = sendData(t_report, sizeof(t_report));
+    return success ? HHCNoErr : HHCErr_SendFailed;    
 }
 
-HHCErr HHCentral::send(EnvironmentReport *t_report)
-{
-    t_report->msgId = msgId++;
-    bool success = sendData(t_report, sizeof(*t_report));
-    return success ? HHCNoErr : HHCErr_SendFailed;
-}
-
-HHCErr HHCentral::send(PulseReport *t_report)
-{
-    t_report->msgId = msgId++;
-    bool success = sendData(t_report, sizeof(*t_report));
-    return success ? HHCNoErr : HHCErr_SendFailed;
-}
-
-HHCErr HHCentral::send(VoltAmperReport *t_report)
-{
-    t_report->msgId = msgId++;
-    bool success = sendData(t_report, sizeof(*t_report));
-    return success ? HHCNoErr : HHCErr_SendFailed;
-}
+template HHCErr HHCentral::send(NodeInfoReport* t_report);
+template HHCErr HHCentral::send(EnvironmentReport* t_report);
+template HHCErr HHCentral::send(PulseReport* t_report);
+template HHCErr HHCentral::send(VoltAmperReport* t_report);
 
 SetRelayStateCommand setRelayStateCmd;
 RestartCommand restartCmd;

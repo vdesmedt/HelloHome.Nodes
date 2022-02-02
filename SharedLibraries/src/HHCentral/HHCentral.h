@@ -78,10 +78,7 @@ class HHCentral
 public:
     HHCentral(HHLogger *logger, enum NodeType t_nodeType, const char *t_version, enum HHEnv t_environment, bool t_highPower = true);
     HHCErr connect(int timeout = 0);
-    HHCErr send(NodeInfoReport *report);
-    HHCErr send(EnvironmentReport *report);
-    HHCErr send(PulseReport *report);
-    HHCErr send(VoltAmperReport *report);
+    template<typename T> HHCErr send(T*);
     Command *check();
     uint16_t sendErrorCount() { return m_sendErrorCount; };
     int16_t LastRssi() { return m_lastRssi; };
