@@ -196,7 +196,7 @@ void loop()
         bool success = radio.sendWithRetry(serInData->destNode, serInData->message, serInData->msgLength, 3, 40);
         digitalWrite(LED, LOW);
 
-        //Log
+        //Log (+RSSI of ACK ???)
         snprintf(screenLogLine, 20, "%s%s %03hu %03d", success ? ">" : "x", cmdType[serInData->message[0] >> 2], serInData->destNode, success ? radio.RSSI : 0);
         addToScreenLog(screenLogLine);
 
