@@ -23,6 +23,14 @@
 	{
 		"name": "NodeConfigurator",
 		"path": "NodeConfigurator"
+	},
+	{
+		"name": "I2CScanner",
+		"path": "I2CScanner"
+	},
+	{
+		"name": "HelloWeather",
+		"path": "HelloWeather"
 	}
 ],
   "settings": {}
