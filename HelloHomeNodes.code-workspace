@@ -30,7 +30,7 @@
 	},
 	{
 		"name": "HelloWeather",
-		"path": "HelloWeather"
+		"path": "HelloWeather/Firmware"
 	}
 ],
   "settings": {}
