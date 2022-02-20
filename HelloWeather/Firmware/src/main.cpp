@@ -38,11 +38,10 @@ void setup()
   digitalWrite(VIN_TRIGGER, HIGH);
 
   pinMode(VIN_MEASURE, INPUT);
+  logger = new HHLogger();
 #ifdef RELEASE
-  logger = new HHLogger(LogMode::Off);
   hhCentral = new HHCentral(logger, NodeType::HelloWeather, GIT_FLAG, HHEnv::Pro);
 #else
-  logger = new HHLogger(LogMode::Text);
   hhCentral = new HHCentral(logger, NodeType::HelloWeather, GIT_FLAG, HHEnv::Dev);
 #endif
   HHCErr err = hhCentral->connect();

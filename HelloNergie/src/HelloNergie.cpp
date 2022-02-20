@@ -54,12 +54,11 @@ void setup()
 {
   Serial.begin(115200);
   Wire.begin();
+  logger = new HHLogger();
 #ifdef RELEASE
-  logger = new HHLogger(LogMode::Off);
-  hhCentral = new HHCentral(logger, NodeType::HelloNergie, GIT_FLAG, HHEnv::Pro, true);
+  hhCentral = new HHCentral(logger, NodeType::HelloNergie, GIT_FLAG, HHEnv::Pro);
 #else
-  logger = new HHLogger(LogMode::Text);
-  hhCentral = new HHCentral(logger, NodeType::HelloNergie, GIT_FLAG, HHEnv::Dev, true);
+  hhCentral = new HHCentral(logger, NodeType::HelloNergie, GIT_FLAG, HHEnv::Dev);
 #endif
   HHCErr err = hhCentral->connect();
   if (err != HHCNoErr)
@@ -151,7 +150,7 @@ void loop()
       nodeReport.vIn = 0;
     }
     nodeReport.sendErrorCount = hhCentral->sendErrorCount();
-    hhCentral->send(&nodeReport);
+    hhCentral->sendReport(&nodeReport);
   }
 
   //Send new pulses
@@ -159,17 +158,17 @@ void loop()
   if (millis() - lastPulseSent > NODE_PULSE_PERIOD)
   {
     bool pulseSent = false;
-    if (pulseReportHal1.newPulses > 0 && HHCNoErr == hhCentral->send(&pulseReportHal1))
+    if (pulseReportHal1.newPulses > 0 && HHCNoErr == hhCentral->sendReport(&pulseReportHal1))
     {
       pulseSent = true;
       pulseReportHal1.newPulses = 0;
     }
-    if (pulseReportHal2.newPulses > 0 && HHCNoErr == hhCentral->send(&pulseReportHal2))
+    if (pulseReportHal2.newPulses > 0 && HHCNoErr == hhCentral->sendReport(&pulseReportHal2))
     {
       pulseSent = true;
       pulseReportHal2.newPulses = 0;
     }
-    if (pulseReportDry1.newPulses > 0 && HHCNoErr == hhCentral->send(&pulseReportDry1))
+    if (pulseReportDry1.newPulses > 0 && HHCNoErr == hhCentral->sendReport(&pulseReportDry1))
     {
       pulseSent = true;
       pulseReportDry1.newPulses = 0;
@@ -187,7 +186,7 @@ void loop()
     envReport.humidity = measures->humidity * 100;
     envReport.pressure = (unsigned int)(measures->pressure/10);
     envReport.temperature  = measures->temperature * 100;
-    hhCentral->send(&envReport);
+    hhCentral->sendReport(&envReport);
     lastEnvSent = millis();  //Does not retry every loop if failing...
   }
 }

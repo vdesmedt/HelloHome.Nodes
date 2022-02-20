@@ -53,7 +53,7 @@ HHCErr HHCentral::connect(int timeout)
     nodeStartedMsg.nodeType = m_nodeType;
     memcpy(nodeStartedMsg.signature, m_flash->UNIQUEID, 8);
     strncpy(nodeStartedMsg.version, m_version, 7);
-    send(&nodeStartedMsg);
+    sendReport(&nodeStartedMsg);
     setRegisterValue(HHRegister::StartCount, ++startCount);
 
     // Wait for response (config)
@@ -103,19 +103,6 @@ HHCErr HHCentral::connect(int timeout)
     m_flash->sleep();
     return HHCNoErr;
 }
-
-template <typename T> HHCErr HHCentral::send(T *t_report)
-{
-    t_report->msgId = msgId++;
-    bool success = sendData(t_report, sizeof(T));
-    return success ? HHCNoErr : HHCErr_SendFailed;
-}
-
-template HHCErr HHCentral::send(NodeStartedReport *t_report);
-template HHCErr HHCentral::send(NodeInfoReport *t_report);
-template HHCErr HHCentral::send(EnvironmentReport *t_report);
-template HHCErr HHCentral::send(PulseReport *t_report);
-template HHCErr HHCentral::send(VoltAmperReport *t_report);
 
 SetRelayStateCommand setRelayStateCmd;
 RestartCommand restartCmd;
@@ -235,6 +222,30 @@ Command *HHCentral::check()
         delete ctrlcmd;
     }
     return cmd;
+}
+
+HHCErr HHCentral::sendReport(Report *t_report) 
+{
+    size_t rptSize = getReportSize(t_report);
+    t_report->msgId = msgId++;
+    bool success = sendData(t_report, rptSize);
+    return success ? HHCNoErr : HHCErr_SendFailed;    
+}
+
+size_t HHCentral::getReportSize(Report* t_report)
+{
+    switch(t_report->msgType)
+    {
+        case RPT_NODESTARTED : return sizeof(NodeStartedReport);
+        case RPT_NODEINFO : return sizeof(NodeInfoReport);
+        case RPT_ENVIRONMENT : return sizeof(EnvironmentReport);
+        case RPT_PULSE : return sizeof(PulseReport);
+        case RPT_VALOG : return sizeof(VoltAmperReport);
+        default:
+            m_logger->logCritical(HHL_UKN_MSG_SIZE_D, t_report->msgType);
+            return 0;
+            break;
+    }
 }
 
 bool HHCentral::sendData(const void *data, size_t dataSize)

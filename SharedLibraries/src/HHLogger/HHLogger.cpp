@@ -22,6 +22,7 @@ HHLogger::HHLogger()
     m_msg[HHL_RFM_RECEIVED] = PSTR("\nRFM Received :");
     m_msg[HHL_ACK_SENT] = PSTR("\nACK Sent");
     m_msg[HHL_LOG_LEVEL_D] = PSTR("\nLog Level set to :%d");
+    m_msg[HHL_UKN_MSG_SIZE_D] = PSTR("\nUnknown message type %d, please add to get HHCentral::getReportSize");
 }
 
 void HHLogger::setLevel(uint8_t logLevel)

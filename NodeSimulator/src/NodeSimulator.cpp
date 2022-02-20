@@ -61,7 +61,7 @@ void sendReport()
             pg_msg.millis = millis();
             break;
         }
-        hhCentral->send(msg[currentMode]);
+        hhCentral->sendReport(msg[currentMode]);
         lastSendMilli = millis();
     }
 }
@@ -91,7 +91,7 @@ void setup()
     pinMode(P_PUSH, INPUT_PULLUP);
 
     pinMode(LED, OUTPUT);
-    hhLogger = new HHLogger(LogMode::Text);
+    hhLogger = new HHLogger();
     hhCentral = new HHCentral(hhLogger, NodeType::Simulator, "1234567", HHEnv::Dev);
     hhCentral->connect(true);
 
@@ -347,7 +347,7 @@ void loop()
     Command *cmd = hhCentral->check();
     if (cmd != nullptr)
     {
-        hhLogger->log(HHL_RPT_RECEIVED, cmd->msgType);
+        hhLogger->logTrace(HHL_RPT_RECEIVED, cmd->msgType);
         switch (cmd->msgType)
         {
         case CMD_SETRELAY:
@@ -358,7 +358,7 @@ void loop()
         }
         break;
         case CMD_PONG:
-            snprintf(screenLogLine, LOGLINELEN, "%lu-Pong %i/%i", millis() - lastSendMilli, ((PongCommand *)cmd)->PingRssi, hhCentral->LastRssi());
+            snprintf(screenLogLine, LOGLINELEN, "%lu-Pong %i/%i", millis() - lastSendMilli, ((PongCommand *)cmd)->pingRssi, hhCentral->LastRssi());
             addToScreenLog(screenLogLine);
             break;
         }

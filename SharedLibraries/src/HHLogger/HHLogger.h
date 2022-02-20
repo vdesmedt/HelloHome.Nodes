@@ -20,6 +20,7 @@
 #define HHL_RFM_RECEIVED 15
 #define HHL_ACK_SENT 16
 #define HHL_LOG_LEVEL_D 17
+#define HHL_UKN_MSG_SIZE_D 18
 #define HHL_LAST_MSG 20
 
 class HHLogger

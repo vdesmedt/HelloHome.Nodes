@@ -14,7 +14,7 @@ void setup()
     Serial.begin(115200);
     Serial.print("Start...");
 
-    logger = new HHLogger(LogMode::Text);
+    logger = new HHLogger();
     hhCentral = new HHCentral(logger, NodeType::Simulator, "1.0", HHEnv::Dev);
     hhCentral->connect();
 
