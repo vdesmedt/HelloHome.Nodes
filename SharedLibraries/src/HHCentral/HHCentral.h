@@ -1,8 +1,9 @@
 #ifndef hhcentral_h
 #define hhcentral_h
 
-#include "HHMessages.h"
-#include "HHLogger.h"
+#include <HHCore.h>
+#include <HHMessages.h>
+#include <HHLogger.h>
 #include <RFM69_OTA.h>
 
 #ifdef __AVR_ATmega1284P__
@@ -14,35 +15,11 @@
 #define RF_ENCRYPT_KEY "passiondesfruits"
 #define RF_GTW_NODE_ID 1
 #define RF_IS_RFM69H
+#define RF_DEFAULT_NODEID 253
 
 #define FLASH_ADR 0x20000
 #define FLASH_ADR_CONFIG 0x8000 // First 0 -> 0x7FFF (32768Kb) used for Dualoptiboot
 #define CONFIG_VERSION 1
-struct NodeConfig
-{
-    uint8_t confVer; // Config version, used to understand is what is read from flash is ok
-    uint16_t nodeId;
-    uint16_t features;
-    uint16_t startCount;
-    uint8_t nodeInfoFreq;
-    uint8_t environmentFreq;
-};
-
-enum HHEnv
-{
-    Dev,
-    Pro
-};
-
-enum NodeType
-{
-    Default = 0,
-    HelloNergie = 1,
-    HelloWeather = 2,
-    ElectronicLoad = 98,
-    Simulator = 99,
-
-};
 
 typedef short HHCErr;
 #define HHCNoErr 0
@@ -51,15 +28,6 @@ typedef short HHCErr;
 #define HHCErr_DataIsNoConfig -3
 #define HHCErr_SignatureMismatch -4
 #define HHCErr_SendFailed -5
-
-typedef enum HHRegister
-{
-    NetworkId = 1,
-    NodeId = 2,
-    HighPower = 3,
-    NodeInfoPeriod = 10,
-    EnvironmentFreq = 20,
-} HHRegister;
 
 struct HHRegisterValue
 {
@@ -76,29 +44,28 @@ private:
 class HHCentral
 {
 public:
-    HHCentral(HHLogger *logger, enum NodeType t_nodeType, const char *t_version, enum HHEnv t_environment, bool t_highPower = true);
+    HHCentral(HHLogger *logger, enum NodeType t_nodeType, const char *t_version, enum HHEnv t_environment);
     HHCErr connect(int timeout = 0);
     template<typename T> HHCErr send(T*);
     Command *check();
     uint16_t sendErrorCount() { return m_sendErrorCount; };
     int16_t LastRssi() { return m_lastRssi; };
-    uint16_t NodeId() { return m_config.nodeId; };
-    uint16_t Features() { return m_config.features; };
+    uint16_t NodeId() { return getRegisterValue(HHRegister::NodeId, RF_DEFAULT_NODEID); };
+    uint16_t Features() { return getRegisterValue(HHRegister::Features, 0); };
     void setRadioToSleepAfterSend() { m_sleepAfterSend = true; };
 
-    int16_t getRegisterValue(HHRegister reg);
-    void setRegisterValue(HHRegister reg, int16_t value);
+    bool loadConfig();
+    int16_t getRegisterValue(HHRegister, int16_t = 0);
+    void setRegisterValue(HHRegister, int16_t);
     void saveRegisterToFlash();
 
 private:
     bool sendData(const void *data, size_t dataSize);
     bool waitRf(int milliseconds);
     enum HHEnv m_environment = HHEnv::Dev;
-    bool m_highPower = true;
     bool m_sleepAfterSend = false;
     uint16_t m_sendErrorCount = 0;
     HHLogger *m_logger;
-    NodeConfig m_config;
     RFM69 *m_radio;
     SPIFlash *m_flash;
     const char *m_version;

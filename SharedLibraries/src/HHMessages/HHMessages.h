@@ -2,6 +2,7 @@
 #define hhmessages_h
 
 #include <Arduino.h>
+#include "HHCore.h"
 
 struct BaseMessage
 {
@@ -29,6 +30,18 @@ struct Command : BaseMessage
 #define RPT_POWER RPT + (8 << 2)
 #define RPT_VALOG RPT + (9 << 2)
 #define RPT_PONG RPT + (10 << 2)
+#define RPT_GETREG RPT + (11 << 2)
+
+struct GetRegisterReport : Report
+{
+    GetRegisterReport()
+    {
+        msgType = RPT_GETREG;        
+    }
+    HHRegister reg;
+    int16_t value;
+};
+
 
 struct PingReport : Report
 {
@@ -158,6 +171,7 @@ struct PongReport :  Report
 #define CMD_PONG CMD + (3 << 2)
 #define CMD_LXI CMD + (4 << 2)
 #define CMD_PING CMD + (5 << 2)
+#define CMD_SETREG CMD + (6 <<2)
 
 struct NodeConfigCommand : Command
 {
@@ -170,6 +184,16 @@ struct NodeConfigCommand : Command
     uint16_t features;
     uint8_t nodeInfoFreq;
     uint8_t environmentFreq;
+};
+
+struct SetRegisterCommand : Command
+{
+    SetRegisterCommand()
+    {
+        msgType = CMD_SETREG;
+    }
+    HHRegister reg;
+    int16_t value;
 };
 
 struct RestartCommand : Command

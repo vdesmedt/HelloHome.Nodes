@@ -1,5 +1,7 @@
 #include "HHCentral.h"
+#include <HHControllerCommand.h>
 #include <avr/wdt.h>
+#include <MemoryFree.h>
 
 void resetFunc()
 {
@@ -8,126 +10,112 @@ void resetFunc()
         ;
 }
 
-HHCentral::HHCentral(HHLogger *logger, enum NodeType t_nodeType, const char *t_version, enum HHEnv t_environment, bool t_highPower)
+HHCentral::HHCentral(HHLogger *logger, enum NodeType t_nodeType, const char *t_version, enum HHEnv t_environment)
 {
     m_logger = logger;
     m_version = t_version;
     m_environment = t_environment;
-    m_nodeType = t_nodeType;
-    m_highPower = t_highPower;
+    m_nodeType = t_nodeType;    
 }
 
-//Initialize config from Flash (if present)
-//Initialize Radio with config from flash or dfazult (NodeId 253)
-//Connect to HelloHome Gateway (Send Startup)
-//Retrieve Config (including NodeId)
-//Store config in flash
-//Puts flash asleep
+// Initialize config from Flash (if present)
+// Initialize Radio with config from flash or dfazult (NodeId 253)
+// Connect to HelloHome Gateway (Send Startup)
+// Retrieve Config (including NodeId)
+// Store config in flash
+// Puts flash asleep
+//If timeout is <= 0 or not specified, will reset the devide until response is received
 HHCErr HHCentral::connect(int timeout)
 {
     m_flash = new SPIFlash(FLASH_SS, 0xEF30);
     if (!m_flash->initialize())
         return HHCErr_FlashInitFailed;
     m_flash->readUniqueId();
+    
+    m_logger->setLevel(getRegisterValue(HHRegister::LogMode, 4));
 
-    //Load config from flash
-    m_flash->readBytes(FLASH_ADR, &m_config, sizeof(NodeConfig));
-    m_config.startCount++;
-    if (CONFIG_VERSION != m_config.confVer)
-    {
-        m_logger->log(HHL_NOCONFIG_OR_NEWVERSION);
-        //First read or new version
-        m_config.confVer = CONFIG_VERSION;
-        m_config.features = 0;
-        m_config.nodeId = 253;
-        m_config.startCount = 1;
-        m_config.environmentFreq = 0;
-        m_config.nodeInfoFreq = 0;
-    }
-
-    //Init radio
-    m_radio = new RFM69();
-    uint8_t networkId = m_environment == HHEnv::Pro ? 51 : 50;
-    m_radio->initialize(RF69_868MHZ, m_config.nodeId, networkId);
+    // Init radio from flash/default config
+    m_radio = new RFM69();    
+    uint8_t rf_netId = m_environment == HHEnv::Pro ? 51 : 50;
+    setRegisterValue(HHRegister::NetworkId, rf_netId);
+    uint16_t rf_nodeId = getRegisterValue(HHRegister::NodeId, RF_DEFAULT_NODEID);
+    m_radio->initialize(RF69_868MHZ, rf_nodeId, rf_netId);
     m_radio->encrypt(RF_ENCRYPT_KEY);
-    if (m_highPower)
+    bool rf_hp = getRegisterValue(HHRegister::HighPower, 1) == 1;
+    if (rf_hp)
         m_radio->setHighPower();
-    m_logger->log(HHL_RF_INIT_UUS, m_config.nodeId, networkId, m_highPower ? "HW" : "H");
-
-    //Send startup report
+    m_logger->logInfo(HHL_RF_INIT_UUS, rf_nodeId, rf_netId, rf_hp ? "HW" : "H");
+    uint16_t startCount = getRegisterValue(HHRegister::StartCount, 0);
+    
+    // Send startup report
     NodeStartedReport nodeStartedMsg;
-    nodeStartedMsg.msgId = msgId++;
-    nodeStartedMsg.startCount = m_config.startCount;
+    nodeStartedMsg.startCount = startCount;
     nodeStartedMsg.nodeType = m_nodeType;
     memcpy(nodeStartedMsg.signature, m_flash->UNIQUEID, 8);
     strncpy(nodeStartedMsg.version, m_version, 7);
-    sendData(&nodeStartedMsg, sizeof(NodeStartedReport));
+    send(&nodeStartedMsg);
+    setRegisterValue(HHRegister::StartCount, ++startCount);
 
-    //Wait for response (config)
+    // Wait for response (config)
     if (!waitRf(timeout == 0 ? 10000 : timeout))
     {
         if (timeout > 0)
             return HHCErr_NoResponseFromGateway;
-        m_logger->log(HHL_RESTARTING);
+        m_logger->logCritical(HHL_RESTARTING);
         resetFunc();
     }
 
-    //Check data if compatible with config
+    // Check data if compatible with config
     if (m_radio->DATALEN != sizeof(NodeConfigCommand) || m_radio->DATA[0] != (2 + (0 << 2)))
     {
-        m_logger->log(HHL_NODECONFIG_EXPECTED_DD, sizeof(NodeConfigCommand), m_radio->DATALEN);
         if (m_radio->ACKRequested())
             m_radio->sendACK();
+        m_logger->logCritical(HHL_NODECONFIG_EXPECTED_DD, sizeof(NodeConfigCommand), m_radio->DATALEN);
         if (timeout > 0)
             return HHCErr_DataIsNoConfig;
         resetFunc();
     }
 
-    //Put response in config struct & ack
+    // Put response in config struct & ack
     NodeConfigCommand receivedConfig;
     memcpy(&receivedConfig, (const void *)m_radio->DATA, sizeof(NodeConfigCommand));
     if (m_radio->ACKRequested())
         m_radio->sendACK();
 
-    //Check config is for right node by testing signature
+    // Check config is for right node by testing signature
     if (memcmp((const void *)&receivedConfig.signature, m_flash->UNIQUEID, 8))
     {
-        m_logger->log(HHL_SIG_MISMATCH);
+        m_logger->logWarn(HHL_SIG_MISMATCH);
         if (timeout > 0)
             return HHCErr_SignatureMismatch;
-        m_logger->log(HHL_RESTARTING);
+        m_logger->logCritical(HHL_RESTARTING);
         resetFunc();
     }
 
-    //Update flash config if needed (nodeId or features)
-    if (m_config.nodeId != receivedConfig.newNodeId || m_config.features != receivedConfig.features)
+    // Update flash config if needed (nodeId)    
+    if (rf_nodeId != receivedConfig.newNodeId)
     {
-        m_logger->log(HHL_NEW_CONFIG_DD, m_config.nodeId, m_config.features);
-        m_config.nodeId = receivedConfig.newNodeId;
-        m_radio->setAddress(m_config.nodeId);
-        m_config.features = receivedConfig.features;
+        setRegisterValue(HHRegister::NodeId, receivedConfig.newNodeId);
+        m_logger->logInfo(HHL_NEW_CONFIG_DD, receivedConfig.newNodeId);
+        m_radio->setAddress(receivedConfig.newNodeId);
     }
-    m_config.nodeInfoFreq = receivedConfig.nodeInfoFreq;
-    m_config.environmentFreq = receivedConfig.environmentFreq;
-    m_flash->blockErase4K(FLASH_ADR);
-    m_flash->writeBytes(FLASH_ADR, &m_config, sizeof(NodeConfig));
-    while(m_flash->busy());
+    saveRegisterToFlash();
     m_flash->sleep();
-    m_logger->log(HHL_SAVED_CONFIG_DDDDDD, m_config.confVer, m_config.features, m_config.nodeId, m_config.startCount, m_config.nodeInfoFreq, m_config.environmentFreq);
     return HHCNoErr;
 }
 
-template <typename T> HHCErr HHCentral::send(T* t_report)
+template <typename T> HHCErr HHCentral::send(T *t_report)
 {
     t_report->msgId = msgId++;
-    bool success = sendData(t_report, sizeof(t_report));
-    return success ? HHCNoErr : HHCErr_SendFailed;    
+    bool success = sendData(t_report, sizeof(T));
+    return success ? HHCNoErr : HHCErr_SendFailed;
 }
 
-template HHCErr HHCentral::send(NodeInfoReport* t_report);
-template HHCErr HHCentral::send(EnvironmentReport* t_report);
-template HHCErr HHCentral::send(PulseReport* t_report);
-template HHCErr HHCentral::send(VoltAmperReport* t_report);
+template HHCErr HHCentral::send(NodeStartedReport *t_report);
+template HHCErr HHCentral::send(NodeInfoReport *t_report);
+template HHCErr HHCentral::send(EnvironmentReport *t_report);
+template HHCErr HHCentral::send(PulseReport *t_report);
+template HHCErr HHCentral::send(VoltAmperReport *t_report);
 
 SetRelayStateCommand setRelayStateCmd;
 RestartCommand restartCmd;
@@ -142,10 +130,11 @@ Command *HHCentral::check()
     {
         CheckForWirelessHEX(*m_radio, *m_flash, false);
         m_lastRssi = m_radio->RSSI;
-        m_logger->log("Received :");
-        for (int i = 0; i < m_radio->DATALEN; i++)
-            m_logger->log("%02X-", m_radio->DATA[i]);
-        m_logger->log("\n");
+        m_logger->logTrace(HHL_RFM_RECEIVED);
+        if(m_logger->getLevel() >= 4) {
+            for (int i = 0; i < m_radio->DATALEN; i++)
+                m_logger->log("%02X-", m_radio->DATA[i]);
+        }
 
         if (m_radio->DATA[0] == restartCmd.msgType)
         {
@@ -173,19 +162,20 @@ Command *HHCentral::check()
             cmd = &pingCommand;
         }
 
-        //Acknowledge
-        if (m_radio->ACKRequested()) {
+        // Acknowledge
+        if (m_radio->ACKRequested())
+        {
             m_radio->sendACK();
-            m_logger->log("ACK Sent");
+            m_logger->logTrace(HHL_ACK_SENT);
         }
 
-        //Restart ?
+        // Restart ?
         if (cmd == &restartCmd)
         {
-            m_logger->log(HHL_RESTARTING);
+            m_logger->logCritical(HHL_RESTARTING);
             resetFunc();
         }
-        //Ping ?
+        // Ping ?
         else if (cmd == &pingCommand)
         {
             PongReport pongReport;
@@ -196,27 +186,76 @@ Command *HHCentral::check()
             sendData(&pongReport, sizeof(pongReport));
         }
     }
+    HHControllerCommand *ctrlcmd = nullptr;
+    HHRegister reg;
+    HHRegisterValue *regs;
+    if (nullptr != (ctrlcmd = HHControllerCommand::receiveDone()))
+    {
+        switch (ctrlcmd->verb())
+        {
+        case HHControllerCommand::CommandVerbs::GetRegisters :
+            Serial.print(F("\n::REGS"));
+            if(!m_configLoaded)
+                loadConfig();
+            regs = m_registers;
+            while(nullptr != regs) {
+                Serial.print(":");
+                Serial.print(regs->reg);
+                regs = regs->next;
+            }
+            Serial.print(":;");
+            break;     
+        case HHControllerCommand::CommandVerbs::GetRegister :
+            reg = static_cast<HHRegister>(ctrlcmd->params()[0]);
+            Serial.print(F("\n::REG:"));
+            Serial.print(ctrlcmd->params()[0]);
+            Serial.print(":");
+            Serial.print(getRegisterValue(reg));
+            Serial.print(":;");
+            break;   
+        case HHControllerCommand::CommandVerbs::SetRegister :
+            reg = static_cast<HHRegister>(ctrlcmd->params()[0]);
+            setRegisterValue(reg, ctrlcmd->params()[1]);
+            break;
+        case HHControllerCommand::CommandVerbs::SaveRegister :
+            saveRegisterToFlash();
+            break;
+        case HHControllerCommand::CommandVerbs::Restart :
+            m_logger->logCritical(HHL_RESTARTING);
+            resetFunc();
+            break;
+        case HHControllerCommand::CommandVerbs::GetFreeMemory :
+            Serial.print(F("\n::MEM:"));
+            Serial.print(freeMemory());
+            Serial.print(":;");
+            break;
+        default:
+            break;
+        }
+        delete ctrlcmd;
+    }
     return cmd;
 }
 
 bool HHCentral::sendData(const void *data, size_t dataSize)
 {
     digitalWrite(LED, HIGH);
-    m_logger->log(HHL_SEND_MSG_D, ((uint8_t *)data)[0], ((uint8_t*)data)[1]);
+    m_logger->logTrace(HHL_SEND_MSG_D, ((uint8_t *)data)[0], ((uint8_t *)data)[1]);
+    //for(int i=0 ; i< dataSize ; i++) Serial.print(((uint8_t*)data)[i], HEX);
     bool success = m_radio->sendWithRetry(RF_GTW_NODE_ID, data, dataSize, 3, 40);
     if (success)
     {
-        m_logger->log(HHL_OK);
+        m_logger->logTrace(HHL_OK);
     }
     else
     {
-        m_logger->log(HHL_NOK);
+        m_logger->logTrace(HHL_NOK);
         m_sendErrorCount++;
     }
     if (m_sleepAfterSend)
     {
         m_radio->sleep();
-        m_logger->log(HHL_RADIO_SLEEP);
+        m_logger->logTrace(HHL_RADIO_SLEEP);
     }
     digitalWrite(LED, LOW);
     return success;
@@ -226,7 +265,7 @@ bool HHCentral::waitRf(int milliseconds)
 {
     int d = 100;
     int retryCount = milliseconds / d;
-    m_logger->log(HHL_WAIT_RF);
+    m_logger->logInfo(HHL_WAIT_RF);
     bool rd = m_radio->receiveDone();
     while (!rd && retryCount-- > 0)
     {
@@ -236,30 +275,60 @@ bool HHCentral::waitRf(int milliseconds)
     }
     if (rd)
     {
-        m_logger->log(HHL_OK);
+        m_logger->logInfo(HHL_OK);
         return true;
     }
-    m_logger->log(HHL_NOK);
+    m_logger->logWarn(HHL_NOK);
     return false;
 }
 
-HHRegisterValue* HHCentral::findRegisterValue(HHRegister reg, int16_t defaultValue) {
+bool HHCentral::loadConfig()
+{
+    char sig[4];
+    m_flash->wakeup();
+    m_flash->readBytes(FLASH_ADR_CONFIG, sig, 4);
+    if (0 == memcmp(sig, "HHCF", 4))
+    {
+        uint32_t adr = FLASH_ADR_CONFIG + 4;
+        m_registers = new HHRegisterValue();
+        HHRegisterValue *p = m_registers;
+        while (null != p)
+        {
+            m_flash->readBytes(adr, p, sizeof(HHRegisterValue));
+            adr += sizeof(HHRegisterValue);
+            if (null != p->next)
+                p->next = new HHRegisterValue();
+            p = p->next;
+        }
+        m_configLoaded = true;
+        m_flash->sleep();
+        return true;
+    }
+    m_flash->sleep();
+    return false;
+}
+
+HHRegisterValue *HHCentral::findRegisterValue(HHRegister reg, int16_t defaultValue)
+{
     HHRegisterValue *p = m_registers;
     HHRegisterValue *prev = m_registers;
-    while(null !=p && p->reg != reg)
+    while (null != p && p->reg != reg)
     {
         prev = p;
         p = p->next;
     }
-    if(null == p) {
-        p  = new HHRegisterValue();
+    if (null == p)
+    {
+        p = new HHRegisterValue();
         p->reg = reg;
         p->next = null;
         p->setValue(defaultValue);
-        if(null != prev) {
+        if (null != prev)
+        {
             prev->next = p;
         }
-        else {
+        else
+        {
             m_registers = p;
         }
         return p;
@@ -267,28 +336,11 @@ HHRegisterValue* HHCentral::findRegisterValue(HHRegister reg, int16_t defaultVal
     return p;
 }
 
-int16_t HHCentral::getRegisterValue(HHRegister reg) 
+int16_t HHCentral::getRegisterValue(HHRegister reg, int16_t defaultValue)
 {
-    if(!m_configLoaded) 
-    {
-        char sig[4];
-        m_flash->readBytes(FLASH_ADR_CONFIG, sig, 4);
-        if(0 == memcmp(sig, "HHCF", 4)) {
-            uint32_t adr = FLASH_ADR_CONFIG + 4;
-            m_registers = new HHRegisterValue();
-            HHRegisterValue *p = m_registers;        
-            while(null != p)
-            {
-                m_flash->readBytes(adr, p, sizeof(HHRegisterValue));
-                adr += sizeof(HHRegisterValue);
-                if(null != p->next)
-                    p->next = new HHRegisterValue();
-                p = p->next;
-            }
-        }
-        m_configLoaded = true;
-    }
-    HHRegisterValue *r = findRegisterValue(reg, 0);
+    if (!m_configLoaded)
+        loadConfig();
+    HHRegisterValue *r = findRegisterValue(reg, defaultValue);
     return r->getValue();
 }
 
@@ -296,20 +348,28 @@ void HHCentral::setRegisterValue(HHRegister reg, int16_t value)
 {
     HHRegisterValue *r = findRegisterValue(reg, 0);
     r->setValue(value);
+    if(reg == HHRegister::LogMode) {        
+        m_logger->setLevel(value);
+    }
 }
 
-void HHCentral::saveRegisterToFlash() {
-    if(null == m_registers)
+void HHCentral::saveRegisterToFlash()
+{
+    if (null == m_registers)
         return;
+    m_flash->wakeup();
     m_flash->blockErase4K(FLASH_ADR_CONFIG);
-    while(m_flash->busy());
+    while (m_flash->busy())
+        ;
     m_flash->writeBytes(FLASH_ADR_CONFIG, "HHCF", 4);
     HHRegisterValue *p = m_registers;
     uint32_t adr = FLASH_ADR_CONFIG + 4;
-    while(null != p)
+    while (null != p)
     {
         m_flash->writeBytes(adr, p, sizeof(HHRegisterValue));
         adr += sizeof(HHRegisterValue);
         p = p->next;
     }
+    m_flash->sleep();
+    m_logger->logTrace(HHL_REGISTER_SAVED);
 }
