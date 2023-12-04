@@ -21,6 +21,6 @@
     "dependencies": {
       
     },
-    "frameworks": "atmelavr, atmelmegaavr",
-    "platforms": "Arduino"
+    "frameworks": "*",
+    "platforms": "*"
   }

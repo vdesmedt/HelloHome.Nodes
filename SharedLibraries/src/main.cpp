@@ -1,7 +1,7 @@
 #include <Arduino.h>
-#include "HHLogger/HHLogger.h"
-#include "HHCentral/HHCentral.h"
-#include "HHMessages/HHMessages.h"
+#include <HHLogger.h>
+#include <HHCentral.h>
+#include <HHMessages.h>
 
 HHLogger *logger;
 HHCentral *hhCentral;
