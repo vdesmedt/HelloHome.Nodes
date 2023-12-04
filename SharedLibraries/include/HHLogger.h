@@ -1,3 +1,4 @@
+#include <avr/pgmspace.h>
 #ifndef HHLogger_h
 #define HHLogger_h
 
