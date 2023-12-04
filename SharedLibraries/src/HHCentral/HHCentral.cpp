@@ -53,7 +53,7 @@ HHCErr HHCentral::connect(int timeout)
     nodeStartedMsg.nodeType = m_nodeType;
     memcpy(nodeStartedMsg.signature, m_flash->UNIQUEID, 8);
     strncpy(nodeStartedMsg.version, m_version, 7);
-    sendReport(&nodeStartedMsg);
+    sendReport(&nodeStartedMsg, sizeof(NodeStartedReport));
     setRegisterValue(HHRegister::StartCount, ++startCount);
 
     // Wait for response (config)
@@ -224,28 +224,11 @@ Command *HHCentral::check()
     return cmd;
 }
 
-HHCErr HHCentral::sendReport(Report *t_report) 
+HHCErr HHCentral::sendReport(Report *t_report, size_t t_rptSize) 
 {
-    size_t rptSize = getReportSize(t_report);
     t_report->msgId = msgId++;
-    bool success = sendData(t_report, rptSize);
+    bool success = sendData(t_report, t_rptSize);
     return success ? HHCNoErr : HHCErr_SendFailed;    
-}
-
-size_t HHCentral::getReportSize(Report* t_report)
-{
-    switch(t_report->msgType)
-    {
-        case RPT_NODESTARTED : return sizeof(NodeStartedReport);
-        case RPT_NODEINFO : return sizeof(NodeInfoReport);
-        case RPT_ENVIRONMENT : return sizeof(EnvironmentReport);
-        case RPT_PULSE : return sizeof(PulseReport);
-        case RPT_VALOG : return sizeof(VoltAmperReport);
-        default:
-            m_logger->logCritical(HHL_UKN_MSG_SIZE_D, t_report->msgType);
-            return 0;
-            break;
-    }
 }
 
 bool HHCentral::sendData(const void *data, size_t dataSize)

@@ -46,7 +46,7 @@ class HHCentral
 public:
     HHCentral(HHLogger *logger, enum NodeType t_nodeType, const char *t_version, enum HHEnv t_environment);
     HHCErr connect(int timeout = 0);    
-    HHCErr sendReport(Report *t_report);
+    HHCErr sendReport(Report *t_report, size_t size);
     Command *check();
     uint16_t sendErrorCount() { return m_sendErrorCount; };
     int16_t LastRssi() { return m_lastRssi; };
@@ -60,7 +60,6 @@ public:
     void saveRegisterToFlash();
 
 private:
-    size_t getReportSize(Report* t_report);
     bool sendData(const void *data, size_t dataSize);
     bool waitRf(int milliseconds);
     enum HHEnv m_environment = HHEnv::Dev;
