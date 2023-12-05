@@ -9,9 +9,6 @@
 // Features
 #define FEAT_ENV 1
 #define FEAT_BATT 2
-#define FEAT_HAL1 4
-#define FEAT_HAL2 8
-#define FEAT_DRY1 16
 
 // Battery
 #define VIN_TRIGGER 15
@@ -19,19 +16,16 @@
 #define VIN_RATIO 2.0 //(4.7 + 4.7) / 4.7
 #define VIN_VREF 3.3
 
-// HAL and DRY contact (Normally High, Fall on detect)
-#define HAL1_PIN 4
-#define HAL2_PIN 5
-#define DRY1_PIN 6
 #define MIN_PULSE_INTERVAL 200
 
-volatile uint8_t newPulse[] = {0, 0, 0};
+volatile uint8_t newPulse[] = {0, 0, 0, 0};
 volatile bool newPulses = false;
 
 HHLogger *logger;
 HHCentral *hhCentral;
 
-PulseReport pulseReportHal1, pulseReportHal2, pulseReportDry1;
+PulseReport pulseReport1, pulseReport2, pulseReport3, pulseReport4;
+PulseReport* pulseReports[] = { &pulseReport1, &pulseReport2, &pulseReport3, &pulseReport4 };
 EnvironmentReport envReport;
 NodeInfoReport nodeReport;
 #ifdef RELEASE
@@ -74,21 +68,8 @@ void setup()
     pinMode(VIN_TRIGGER, OUTPUT);
     pinMode(VIN_MEASURE, INPUT);
   }
-  if (features & FEAT_HAL1)
-  {
-    logger->log("HAL1 Enabled\n");
-    pinMode(HAL1_PIN, INPUT_PULLUP);
-  }
-  if (features & FEAT_HAL2)
-  {
-    logger->log("HAL2 Enabled\n");
-    pinMode(HAL2_PIN, INPUT_PULLUP);
-  }
-  if (features & FEAT_DRY1)
-  {
-    logger->log("DRY1 Enabled\n");
-    pinMode(DRY1_PIN, INPUT_PULLUP);
-  }
+  for (int i = 0; i < 4; i++)
+    pinMode(4+i, INPUT_PULLUP);
 
   // Initialize BE280 sensor if feature enabled
   if (features & FEAT_ENV)
@@ -106,11 +87,11 @@ void setup()
   }
 
   // Initialize messages
-  pulseReportHal1.newPulses = pulseReportHal2.newPulses = pulseReportDry1.newPulses = 0;
-  pulseReportHal1.isOffset = pulseReportHal2.isOffset = pulseReportDry1.isOffset = false;
-  pulseReportHal1.portNumber = 10;
-  pulseReportHal2.portNumber = 11;
-  pulseReportDry1.portNumber = 12;
+  for(int i=0 ; i<4; i++) {
+    pulseReports[i]->newPulses = 0;    
+    pulseReports[i]->isOffset = false;
+    pulseReports[i]->portNumber = 10 + i;
+  }
 
   envReport.temperature = envReport.humidity = envReport.pressure = 0;
   nodeReport.sendErrorCount = nodeReport.vIn = 0;
@@ -125,13 +106,13 @@ void loop()
   if (newPulses)
   {
     detachInterrupt(digitalPinToInterrupt(3));
-    pulseReportHal1.newPulses += newPulse[0];
-    pulseReportHal2.newPulses += newPulse[1];
-    pulseReportDry1.newPulses += newPulse[2];
-    newPulse[0] = newPulse[1] = newPulse[2] = 0;
+    for(int i=0 ; i<4; i++) {
+      pulseReports[i]->newPulses += newPulse[i];
+      newPulse[i] = 0;
+    }
     newPulses = false;
     attachInterrupt(digitalPinToInterrupt(3), pulse_ISR, FALLING);
-    logger->log("New pulses %d %d %d\n", pulseReportHal1.newPulses, pulseReportHal2.newPulses, pulseReportDry1.newPulses);
+    logger->log("New pulses %d %d %d %d\n", pulseReport1.newPulses, pulseReport2.newPulses, pulseReport3.newPulses, pulseReport4.newPulses);
   }
 
   // Measure battery voltage
@@ -150,31 +131,21 @@ void loop()
       nodeReport.vIn = 0;
     }
     nodeReport.sendErrorCount = hhCentral->sendErrorCount();
-    hhCentral->sendReport(&nodeReport);
+    hhCentral->sendReport(&nodeReport, sizeof(NodeInfoReport));
   }
 
   //Send new pulses
   static unsigned long lastPulseSent = 0;
   if (millis() - lastPulseSent > NODE_PULSE_PERIOD)
   {
-    bool pulseSent = false;
-    if (pulseReportHal1.newPulses > 0 && HHCNoErr == hhCentral->sendReport(&pulseReportHal1))
+    for (int i = 0; i < 4; i++)
     {
-      pulseSent = true;
-      pulseReportHal1.newPulses = 0;
+      if (pulseReports[i]->newPulses > 0 && HHCNoErr == hhCentral->sendReport(pulseReports[i], sizeof(PulseReport)))
+      {
+        pulseReports[i]->newPulses = 0;
+        lastPulseSent = millis();
+      }
     }
-    if (pulseReportHal2.newPulses > 0 && HHCNoErr == hhCentral->sendReport(&pulseReportHal2))
-    {
-      pulseSent = true;
-      pulseReportHal2.newPulses = 0;
-    }
-    if (pulseReportDry1.newPulses > 0 && HHCNoErr == hhCentral->sendReport(&pulseReportDry1))
-    {
-      pulseSent = true;
-      pulseReportDry1.newPulses = 0;
-    }
-    if (pulseSent)
-      lastPulseSent = millis();
   }
 
   //Send environment values
@@ -186,32 +157,21 @@ void loop()
     envReport.humidity = measures->humidity * 100;
     envReport.pressure = (unsigned int)(measures->pressure/10);
     envReport.temperature  = measures->temperature * 100;
-    hhCentral->sendReport(&envReport);
+    hhCentral->sendReport(&envReport, sizeof(NodeInfoReport));
     lastEnvSent = millis();  //Does not retry every loop if failing...
   }
 }
 
 void pulse_ISR()
 {
-  static unsigned long lastPulseMillis[]{0, 0, 0};
+  static unsigned long lastPulseMillis[]{0, 0, 0, 0};
   unsigned long now = millis();
 
-  if (features & FEAT_HAL1 && digitalRead(HAL1_PIN) == LOW && now - lastPulseMillis[0] > MIN_PULSE_INTERVAL)
-  {
-    newPulse[0]++;
-    newPulses = true;
-    lastPulseMillis[0] = now;
-  }
-  if (features & FEAT_HAL2 && digitalRead(HAL2_PIN) == LOW && now - lastPulseMillis[1] > MIN_PULSE_INTERVAL)
-  {
-    newPulse[1]++;
-    newPulses = true;
-    lastPulseMillis[1] = now;
-  }
-  if (features & FEAT_DRY1 && digitalRead(DRY1_PIN) == LOW && now - lastPulseMillis[2] > MIN_PULSE_INTERVAL)
-  {
-    newPulse[2]++;
-    newPulses = true;
-    lastPulseMillis[2] = now;
-  }
+  for (int i = 0; i < 4; i++)
+    if (digitalRead(4+i) == LOW && now - lastPulseMillis[i] > MIN_PULSE_INTERVAL)
+    {
+      newPulse[i]++;
+      newPulses = true;
+      lastPulseMillis[i] = now;
+    }
 }
