@@ -1,4 +1,4 @@
-#include "HHCentral.h"
+#include <HHCentral.h>
 #include <HHControllerCommand.h>
 #include <avr/wdt.h>
 #include <MemoryFree.h>
@@ -24,7 +24,7 @@ HHCentral::HHCentral(HHLogger *logger, enum NodeType t_nodeType, const char *t_v
 // Retrieve Config (including NodeId)
 // Store config in flash
 // Puts flash asleep
-//If timeout is <= 0 or not specified, will reset the devide until response is received
+//If timeout is <= 0 or not specified, will reset the device until response is received
 HHCErr HHCentral::connect(int timeout)
 {
     m_flash = new SPIFlash(FLASH_SS, 0xEF30);
@@ -76,7 +76,7 @@ HHCErr HHCentral::connect(int timeout)
         resetFunc();
     }
 
-    // Put response in config struct & ack
+    // Put response in NodeConfigCommand struct & ack
     NodeConfigCommand receivedConfig;
     memcpy(&receivedConfig, (const void *)m_radio->DATA, sizeof(NodeConfigCommand));
     if (m_radio->ACKRequested())
@@ -99,6 +99,10 @@ HHCErr HHCentral::connect(int timeout)
         m_logger->logInfo(HHL_NEW_CONFIG_DD, receivedConfig.newNodeId);
         m_radio->setAddress(receivedConfig.newNodeId);
     }
+    setRegisterValue(HHRegister::Features, receivedConfig.features);
+    setRegisterValue(HHRegister::NodeInfoPeriod, receivedConfig.nodeInfoFreq);
+    setRegisterValue(HHRegister::EnvironmentFreq, receivedConfig.environmentFreq);
+    
     saveRegisterToFlash();
     m_flash->sleep();
     return HHCNoErr;
@@ -224,6 +228,7 @@ Command *HHCentral::check()
     return cmd;
 }
 
+//SHould I make a version of that method that determine the size based on MsgType ?
 HHCErr HHCentral::sendReport(Report *t_report, size_t t_rptSize) 
 {
     t_report->msgId = msgId++;
@@ -298,6 +303,10 @@ bool HHCentral::loadConfig()
         m_flash->sleep();
         return true;
     }
+    else
+    {
+        m_dirty_registers = true;
+    }
     m_flash->sleep();
     return false;
 }
@@ -341,9 +350,13 @@ int16_t HHCentral::getRegisterValue(HHRegister reg, int16_t defaultValue)
 void HHCentral::setRegisterValue(HHRegister reg, int16_t value)
 {
     HHRegisterValue *r = findRegisterValue(reg, 0);
-    r->setValue(value);
+    if(r->getValue() != value) {
+        r->setValue(value);
+        m_dirty_registers = true;
+    }
     if(reg == HHRegister::LogMode) {        
         m_logger->setLevel(value);
+        m_logger->logTrace(HHL_LOG_LEVEL_D, value);
     }
 }
 
@@ -351,6 +364,10 @@ void HHCentral::saveRegisterToFlash()
 {
     if (null == m_registers)
         return;
+    if (!m_dirty_registers) {
+        m_logger->logTrace(HHL_REGS_NOT_DIRTY);
+        return;
+    }
     m_flash->wakeup();
     m_flash->blockErase4K(FLASH_ADR_CONFIG);
     while (m_flash->busy())
@@ -366,4 +383,5 @@ void HHCentral::saveRegisterToFlash()
     }
     m_flash->sleep();
     m_logger->logTrace(HHL_REGISTER_SAVED);
+    m_dirty_registers = false;
 }
