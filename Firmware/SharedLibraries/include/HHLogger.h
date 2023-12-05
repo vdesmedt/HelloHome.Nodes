@@ -23,6 +23,7 @@
 #define HHL_LOG_LEVEL_D 17
 #define HHL_UKN_MSG_SIZE_D 18
 #define HHL_LAST_MSG 20
+#define HHL_REGS_NOT_DIRTY 21
 
 class HHLogger
 {

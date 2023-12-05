@@ -23,6 +23,7 @@ HHLogger::HHLogger()
     m_msg[HHL_ACK_SENT] = PSTR("\nACK Sent");
     m_msg[HHL_LOG_LEVEL_D] = PSTR("\nLog Level set to :%d");
     m_msg[HHL_UKN_MSG_SIZE_D] = PSTR("\nUnknown message type %d, please add to get HHCentral::getReportSize");
+    m_msg[HHL_REGS_NOT_DIRTY] =PSTR("Register not dirty, no need to write flash");
 }
 
 void HHLogger::setLevel(uint8_t logLevel)
