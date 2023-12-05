@@ -1,0 +1,33 @@
+{
+  "folders": [
+	{
+		"path": "RFM2Pi"
+	},
+	{
+		"path": "SharedLibraries"
+	},
+	{
+		"path": "HelloNergie"
+	},
+	{
+		"path": "HelloWeather"
+	},
+	{
+		"path": "NodeConfigurator"
+	},
+	{
+		"path": "NodeSimulator"
+	},
+	{
+		"path": "I2CScanner"
+	},
+	{
+		"path": "OTA"
+	},
+	{
+		"name": "CAN-OBD2-Test",
+		"path": "../../PlatformIO/Projects/CAN-OBD2-Test"
+	}
+],
+  "settings": {}
+}
