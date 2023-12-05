@@ -47,6 +47,7 @@ HHControllerCommand* HHControllerCommand::parse(char* commandString)
 
     HHControllerCommand * cmd = nullptr;
     token* ctk = first;
+    
     if(0 == strcmp("REG", ctk->content))
     {
         ctk = ctk->next;
@@ -54,9 +55,11 @@ HHControllerCommand* HHControllerCommand::parse(char* commandString)
         ctk = ctk->next;
         if(0 == strcmp("?", ctk->content))
         {
+            //REG:1 ?  -> Query Register 1
             cmd = new HHControllerCommand(CommandVerbs::GetRegister);
             cmd->m_param[0] = r;
         } else {
+            //REG:1:5  -> Set value 5 in register 1
             int v = atoi(ctk->content);
             cmd = new HHControllerCommand(CommandVerbs::SetRegister);
             cmd->m_param[0] = r;

@@ -18,9 +18,13 @@ class HHControllerCommand
             SaveRegister = 5,
             GetFreeMemory = 6,
         } CommandVerbs;
-        static HHControllerCommand* receiveDone();
-        static HHControllerCommand* parse(char* commandString);
+
         HHControllerCommand(CommandVerbs verb);
+        // Read and Parse a command from Serial
+        static HHControllerCommand* receiveDone();
+        // Parse a command
+        static HHControllerCommand* parse(char* commandString);
+        //Properties
         CommandVerbs verb() { return m_verb; }
         int16_t* params() { return m_param; }
     private :
