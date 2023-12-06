@@ -9,8 +9,8 @@ typedef enum HHRegister
     HighPower = 4,
     Features = 5,
     LogMode = 7,
-    NodeInfoPeriod = 10,  //Time betwwen two sendings of the node info report (in Seconds)
-    EnvironmentFreq = 20, //Time between two sendings of the environmental report (in seconds)    
+    NodeInfoReportPeriod = 10,  //Time betwwen two sendings of the node info report (in Seconds)
+    EnvironmentReportPeriod = 20, //Time between two sendings of the environmental report (in seconds)    
 } HHRegister;
 
 enum HHEnv

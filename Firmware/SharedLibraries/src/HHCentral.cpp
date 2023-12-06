@@ -100,9 +100,8 @@ HHCErr HHCentral::connect(int timeout)
         m_radio->setAddress(receivedConfig.newNodeId);
     }
     setRegisterValue(HHRegister::Features, receivedConfig.features);
-    setRegisterValue(HHRegister::NodeInfoPeriod, receivedConfig.nodeInfoFreq);
-    setRegisterValue(HHRegister::EnvironmentFreq, receivedConfig.environmentFreq);
-    
+    setRegisterValue(HHRegister::NodeInfoReportPeriod, receivedConfig.nodeInfoFreq);
+    setRegisterValue(HHRegister::EnvironmentReportPeriod, receivedConfig.environmentFreq);
     saveRegisterToFlash();
     m_flash->sleep();
     return HHCNoErr;
