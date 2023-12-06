@@ -13,20 +13,19 @@ typedef enum HHRegister
     EnvironmentReportPeriod = 20, //Time between two sendings of the environmental report (in seconds)    
 } HHRegister;
 
-enum HHEnv
+typedef enum HHEnv
 {
     Dev,
     Pro
-};
+} HHEnv;
 
-enum NodeType
+typedef enum NodeType
 {
     Default = 0,
     HelloNergie = 1,
     HelloWeather = 2,
     ElectronicLoad = 98,
     Simulator = 99,
-
-};
+} NodeType;
 
 #endif

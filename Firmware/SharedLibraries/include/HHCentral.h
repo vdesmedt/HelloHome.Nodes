@@ -35,7 +35,7 @@ typedef short HHCErr;
 class HHCentral
 {
 public:
-    HHCentral(HHLogger *logger, enum NodeType t_nodeType, const char *t_version, enum HHEnv t_environment);
+    HHCentral(HHLogger *logger, NodeType t_nodeType, const char *t_version, HHEnv t_environment);
     HHCErr connect(int timeout = 0);    
     HHCErr sendReport(Report *t_report, size_t size);
     Command *check();
@@ -53,7 +53,7 @@ public:
 private:
     bool sendData(const void *data, size_t dataSize);
     bool waitRf(int milliseconds);
-    enum HHEnv m_environment = HHEnv::Dev;
+    HHEnv m_environment = HHEnv::Dev;
     bool m_sleepAfterSend = false;
     uint16_t m_sendErrorCount = 0;
     HHLogger *m_logger;
@@ -61,7 +61,7 @@ private:
     SPIFlash *m_flash;
     const char *m_version;
     int16_t m_lastRssi;
-    enum NodeType m_nodeType = NodeType::Default;
+    NodeType m_nodeType = NodeType::Default;
     uint8_t msgId = 12;
     bool m_configLoaded = false;
     HHRegisterValue *m_registers = null;
