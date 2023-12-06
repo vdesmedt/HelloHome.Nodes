@@ -13,5 +13,6 @@ public:
     bool isDirty() { return m_dirty; };
 private:
     int16_t m_value;
+    //Individual register dirtyness was made to distinguish between default value (which need save) and loaded value (which does not)
     bool m_dirty = false;
 };
