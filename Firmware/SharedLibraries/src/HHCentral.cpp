@@ -10,7 +10,7 @@ void resetFunc()
         ;
 }
 
-HHCentral::HHCentral(HHLogger *logger, enum NodeType t_nodeType, const char *t_version, enum HHEnv t_environment)
+HHCentral::HHCentral(HHLogger *logger, NodeType t_nodeType, const char *t_version, HHEnv t_environment)
 {
     m_logger = logger;
     m_version = t_version;
