@@ -302,10 +302,6 @@ bool HHCentral::loadConfig()
         m_flash->sleep();
         return true;
     }
-    else
-    {
-        m_dirty_registers = true;
-    }
     m_flash->sleep();
     return false;
 }
@@ -325,6 +321,7 @@ HHRegisterValue *HHCentral::findRegisterValue(HHRegister reg, int16_t defaultVal
         p->reg = reg;
         p->next = null;
         p->setValue(defaultValue);
+        p->markAsDirty();
         if (null != prev)
         {
             prev->next = p;
@@ -351,7 +348,7 @@ void HHCentral::setRegisterValue(HHRegister reg, int16_t value)
     HHRegisterValue *r = findRegisterValue(reg, 0);
     if(r->getValue() != value) {
         r->setValue(value);
-        m_dirty_registers = true;
+        r->markAsDirty();
     }
     if(reg == HHRegister::LogMode) {        
         m_logger->setLevel(value);
@@ -363,7 +360,17 @@ void HHCentral::saveRegisterToFlash()
 {
     if (null == m_registers)
         return;
-    if (!m_dirty_registers) {
+    
+    bool someDirty = false;
+    HHRegisterValue *p = m_registers;
+    while(null != p) {
+        if(p->isDirty())
+            someDirty = true;
+        p = p->next;
+    }
+    
+
+    if (!someDirty) {
         m_logger->logTrace(HHL_REGS_NOT_DIRTY);
         return;
     }
@@ -372,15 +379,15 @@ void HHCentral::saveRegisterToFlash()
     while (m_flash->busy())
         ;
     m_flash->writeBytes(FLASH_ADR_CONFIG, "HHCF", 4);
-    HHRegisterValue *p = m_registers;
+    p = m_registers;
     uint32_t adr = FLASH_ADR_CONFIG + 4;
     while (null != p)
     {
         m_flash->writeBytes(adr, p, sizeof(HHRegisterValue));
+        p->markAsClean();
         adr += sizeof(HHRegisterValue);
         p = p->next;
     }
     m_flash->sleep();
     m_logger->logTrace(HHL_REGISTER_SAVED);
-    m_dirty_registers = false;
 }

@@ -4,6 +4,7 @@
 #include <HHCore.h>
 #include <HHMessages.h>
 #include <HHLogger.h>
+#include <HHRegisterValue.h>
 #include <RFM69_OTA.h>
 
 #ifdef __AVR_ATmega1284P__
@@ -29,17 +30,7 @@ typedef short HHCErr;
 #define HHCErr_SignatureMismatch -4
 #define HHCErr_SendFailed -5
 
-struct HHRegisterValue
-{
-public:
-    HHRegister reg;
-    int16_t getValue() { return m_value; };
-    void setValue(int16_t value) { m_value = value; };
-    HHRegisterValue *next;
 
-private:
-    int16_t m_value;
-};
 
 class HHCentral
 {
@@ -75,7 +66,6 @@ private:
     bool m_configLoaded = false;
     HHRegisterValue *m_registers = null;
     HHRegisterValue *findRegisterValue(HHRegister reg, int16_t defaultValue = 0);
-    bool m_dirty_registers = false; 
 };
 
 #endif
